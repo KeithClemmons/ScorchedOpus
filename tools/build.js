@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-/* Bundles index.html + js/*.js into single-file builds:
+/* Bundles index.html + js/*.js into a single-file build:
  *   dist/scorched-opus.html  - standalone page (double-click to play)
- *   dist/artifact.html       - same page as a fragment (no html/head/body), for hosts that wrap it
+ *   dist/index.html          - the same page, for web hosts to serve at /
  * Third-party scripts in vendor/ keep their own <script> tag; fonts/ are embedded as data URIs,
  * so the built page fetches nothing from anywhere.
  */
@@ -30,13 +30,7 @@ const dist = path.join(root, 'dist');
 fs.mkdirSync(dist, { recursive: true });
 fs.writeFileSync(path.join(dist, 'scorched-opus.html'), inlined);
 fs.writeFileSync(path.join(dist, 'index.html'), inlined);                       // what a web host serves at /
-fs.writeFileSync(path.join(dist, '.assetsignore'), 'artifact.html\n.assetsignore\n');   // Cloudflare: don't serve these
-
-const title = inlined.match(/<title>[\s\S]*?<\/title>/)[0];
-const links = (inlined.match(/<link [^>]*>/g) || []).join('\n');
-const style = inlined.match(/<style>[\s\S]*?<\/style>/)[0];
-const body = inlined.match(/<body>([\s\S]*)<\/body>/)[1];
-fs.writeFileSync(path.join(dist, 'artifact.html'), title + '\n' + links + '\n' + style + '\n' + body.trim() + '\n');
+fs.writeFileSync(path.join(dist, '.assetsignore'), '.assetsignore\n');   // Cloudflare: don't serve this
 
 const kb = f => (fs.statSync(path.join(dist, f)).size / 1024).toFixed(1) + ' KB';
-console.log('built dist/scorched-opus.html (' + kb('scorched-opus.html') + ') and dist/artifact.html (' + kb('artifact.html') + ') from ' + srcs.length + ' scripts');
+console.log('built dist/scorched-opus.html (' + kb('scorched-opus.html') + ') from ' + srcs.length + ' scripts');

@@ -92,67 +92,6 @@ const an = Net.applyNext.bind(Net);
 Net.applyNext = lock => { const m = Net.queue[0]; if (m && checkpoint(m.c) && Net.inBattle()) { __cp[m.seq] = __parts(); delete __cp[m.seq - 60]; } an(lock); };
 1`;
 
-// a stand-in for the claude.ai page room (window.claude.use('room')) between the two frames, with
-// its documented limits: 4 KiB per message, ~40 messages/s (burst 80) then drops, own messages echoed
-const MOCK_ROOM = `(() => {
-  const me = 'P' + Math.random().toString(36).slice(2, 12), ch = new BroadcastChannel('mock-room');
-  const others = new Map(), topics = {}, peerFns = [], connFns = [];
-  let pres = {}, tokens = 80, last = performance.now(), snap = null;
-  window.__roomStats = { sent: 0, dropped: 0, tooBig: 0 };
-  const bytes = o => new TextEncoder().encode(JSON.stringify(o)).length;
-  const self = () => Object.freeze({ peer: me, by: null, isMe: true, sameTab: true, kind: 'viewer', guest: false, presence: Object.freeze(Object.assign({}, pres)), updatedAt: Date.now() });
-  const list = () => { if (!snap) snap = Object.freeze([self(), ...[...others.values()].map(o => o.p)]); return snap; };
-  const changed = (joined, left, updated) => { snap = null; const c = { peers: list(), joined: joined || [], left: left || [], updated: updated || [] }; setTimeout(() => peerFns.forEach(f => f(c)), 0); };
-  const post = d => { d.from = me; ch.postMessage(d); };
-  ch.onmessage = e => {
-    const d = e.data;
-    if (!d || d.from === me) return;
-    const had = others.get(d.from);
-    if (d.op === 'bye') { if (had) { others.delete(d.from); changed([], [had.p]); } return; }
-    if (d.op === 'hb' || d.op === 'pres') {
-      const p = Object.freeze({ peer: d.from, by: null, isMe: false, sameTab: false, kind: 'viewer', guest: false, presence: Object.freeze(d.p || {}), updatedAt: Date.now() });
-      others.set(d.from, { p, seen: Date.now() });
-      if (!had) changed([p]); else if (d.op === 'pres') changed([], [], [p]);
-      return;
-    }
-    if (d.op === 'msg') { if (had) had.seen = Date.now(); (topics[d.topic] || []).forEach(f => f({ peer: d.from, by: null, isMe: false, sameTab: false, kind: 'viewer', guest: false, topic: d.topic, data: d.data })); }
-  };
-  setInterval(() => {
-    post({ op: 'hb', p: pres });
-    const now = Date.now(), gone = [];
-    for (const [id, o] of others) if (now - o.seen > 3500) { others.delete(id); gone.push(o.p); }
-    if (gone.length) changed([], gone);
-  }, 800);
-  post({ op: 'hb', p: pres });
-  window.addEventListener('beforeunload', () => post({ op: 'bye' }));
-  const room = {
-    emit(topic, data) {
-      const now = performance.now();
-      tokens = Math.min(80, tokens + (now - last) * 0.04); last = now;
-      if (bytes(data) > 4096) { __roomStats.tooBig++; return Promise.reject({ code: 'invalid_argument', message: 'data over 4 KiB' }); }
-      if (tokens < 1) { __roomStats.dropped++; return Promise.resolve(); }
-      tokens--; __roomStats.sent++;
-      post({ op: 'msg', topic, data });
-      const echo = { peer: me, by: null, isMe: true, sameTab: true, kind: 'viewer', guest: false, topic, data };
-      setTimeout(() => (topics[topic] || []).forEach(f => f(echo)), 0);
-      return Promise.resolve();
-    },
-    on(topic, fn) { (topics[topic] = topics[topic] || []).push(fn); return () => { topics[topic] = topics[topic].filter(f => f !== fn); }; },
-    presence(patch) {
-      const next = Object.assign({}, pres);
-      for (const k in patch) { if (patch[k] === null) delete next[k]; else next[k] = patch[k]; }
-      if (bytes(next) > 4096) return Promise.reject({ code: 'invalid_argument', message: 'presence over 4 KiB' });
-      pres = next; snap = null; post({ op: 'pres', p: pres });
-      return Promise.resolve();
-    },
-    peers: list,
-    onPeers(fn) { peerFns.push(fn); setTimeout(() => fn({ peers: list(), joined: list(), left: [], updated: [] }), 0); return () => {}; },
-    onConnection(fn) { connFns.push(fn); setTimeout(() => fn(true), 0); return () => {}; },
-    connected: () => true
-  };
-  window.claude = { use: async name => (name === 'room' ? room : null) };
-})(); 1`;
-
 window.reloadBoth = async () => {
   const fa = document.getElementById('a'), fb = document.getElementById('b');
   const la = new Promise(r => { fa.onload = r; }), lb = new Promise(r => { fb.onload = r; });
@@ -166,14 +105,11 @@ window.setup = async (code, cfg, ais, kind, url) => {
   kind = kind || 'local';
   url = url || (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
   await reloadBoth();
-  if (kind === 'room') { A().eval(MOCK_ROOM); B().eval(MOCK_ROOM); }
   const o = n => JSON.stringify({ code, name: n, icon: n === 'Hosty' ? 0 : 2, url });
   await A().eval(`Net.open('${kind}', ${o('Hosty')})`);
   A().__g('Net.host(); App.set(new LobbyScene()); 1');
   await B().eval(`Net.open('${kind}', ${o('Joiny')})`);
   B().__g('App.set(new JoinScene()); 1');
-  // the page room lists games to pick from; room codes find theirs by themselves
-  if (kind === 'room') { await pump(8, () => B().__g('Net.games().length') > 0, { realtime: true }); B().__g('App.scene.pick(Net.games()[0]); 1'); }
   await pump(5, () => A().__g('Net.lobby.seats.length') >= 2 && B().__g('Net.seated'));
   A().__g(`for (const ai of ${JSON.stringify(ais || [])}) { Net.addComputer(); Net.lobby.seats[Net.lobby.seats.length - 1].ai = ai; }
     Object.assign(Cfg, ${JSON.stringify(cfg || {})}); applyGraphicsMode(); Net.publishLobby(); 1`);

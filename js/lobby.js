@@ -52,11 +52,9 @@ class NetScene {
     const roomL = d.text('&Room code:', 10, 71);
     const roomF = d.textField(f, 'code', fx, 68, 60, 8, () => { f.code = cleanCode(f.code); });
     roomF.hot = 'r';
-    roomL.hidden = roomF.hidden = () => f.kind === 'room';
-    d.button('Ne&w', fx + 64, 68, 36, 12, () => { f.code = rid(4); }, { hidden: () => f.kind === 'room' });
+    d.button('Ne&w', fx + 64, 68, 36, 12, () => { f.code = rid(4); });
     d.add({ x: 10, y: 86, w: 0, h: 0, kind: 'label', draw: s => {
       const help = {
-        room: 'You play with people who have this page open. Friends need access to the page (interact or edit) - share it from the Share menu.',
         ws: Net.hosted() && Net.relayHere()
           ? 'Host: press Host Game and tell your friends the room code. Friends: open this same site, type that room code, then press Join Game.'
           : 'Everyone connects to the same game server and room code. Run server/server.js (npm start) somewhere your friends can reach.',
@@ -81,7 +79,7 @@ class NetScene {
     f.name = cleanName(f.name);
     f.code = cleanCode(f.code);
     if (!f.name) { this.status = 'Type your name first.'; Sound.error(); return; }
-    if (f.kind !== 'room' && f.code.length < 3) { this.status = 'The room code needs at least 3 letters.'; Sound.error(); return; }
+    if (f.code.length < 3) { this.status = 'The room code needs at least 3 letters.'; Sound.error(); return; }
     if (f.kind === 'ws' && !/^wss?:\/\/.+/i.test(f.url)) { this.status = 'The server address starts with ws:// or wss://'; Sound.error(); return; }
     Store.set('scorch.net', f);
     this.busy = true; this.status = 'Connecting...';
@@ -105,7 +103,7 @@ class NetScene {
 
 /* ------------------------------------------------ find a game to join */
 class JoinScene {
-  constructor() { this.btns = []; this.t = 0; this.auto = Net.kind !== 'room'; }
+  constructor() { this.btns = []; this.t = 0; this.auto = true; }
   enter() { UI.clear(); }
   update(dt) {
     this.t += dt;
@@ -132,13 +130,13 @@ class JoinScene {
     const x = Math.floor((Screen.UW - W) / 2), y = Math.floor((Screen.UH - H) / 2);
     frame(s, x, y, W, H);
     Font.center(s, 'Join a Network Game', x + W / 2, y + 6, UIC.text);
-    Font.center(s, Net.kind === 'room' ? 'Games on this page' : 'Room ' + Net.code + ' (' + Net.kindLabel() + ')', x + W / 2, y + 18, UIC.dis);
+    Font.center(s, 'Room ' + Net.code + ' (' + Net.kindLabel() + ')', x + W / 2, y + 18, UIC.dis);
     this.btns = [];
     const games = Net.games();
     const open = games.filter(g => g.open);
     if (!open.length) {
       const lines = games.length ? ['The games here have already started.', 'Wait for the next one, or host your own.']
-        : ['Looking for games' + '...'.slice(0, 1 + Math.floor(this.t * 2) % 3), Net.kind === 'room' ? 'Ask a friend to press Host Game here.' : 'Ask the host for the room code.']
+        : ['Looking for games' + '...'.slice(0, 1 + Math.floor(this.t * 2) % 3), 'Ask the host for the room code.']
           .concat(Net.kind === 'ws' && this.t > 6 ? ['', 'Nothing yet in room ' + Net.code + '.', 'Check the host pressed Host Game with this', 'same room code, on this same website.'] : [])
           .concat(Net.kind === 'peer' && this.t > 6 ? ['', 'Nothing yet in room ' + Net.code + '.', 'Check the host picked peer to peer and', 'pressed Host Game with this same room code.'] : [])
           .concat(Net.kind === 'local' && this.t > 4 ? ['', '"This browser" only finds tabs on this computer.', 'To play a friend, go Back and pick game server.'] : []);
@@ -223,7 +221,7 @@ class LobbyScene {
     const host = Net.isHost(), seats = this.seats(), cfg = this.cfg();
     frame(s, x, y, W, H);
     Font.center(s, 'Network Game Lobby', x + W / 2, y + 6, UIC.text);
-    const where = Net.kind === 'room' ? 'Playing through this page (claude.ai)' : 'Room ' + Net.code + ' - ' + Net.kindLabel();
+    const where = 'Room ' + Net.code + ' - ' + Net.kindLabel();
     Font.center(s, where, x + W / 2, y + 17, UIC.blue);
     this.btns = [];
     const teams = cfg.teams && cfg.teams !== 'NONE';
@@ -282,7 +280,7 @@ class LobbyScene {
     }
     // status + buttons
     let status;
-    if (host) status = seats.length < 2 ? 'Add computers or wait for friends to join.' : (Net.kind === 'room' ? 'Friends can join from this page.' : 'Friends join with room code ' + Net.code + '.');
+    if (host) status = seats.length < 2 ? 'Add computers or wait for friends to join.' : 'Friends join with room code ' + Net.code + '.';
     else if (!Net.lobby) status = 'Contacting the host...';
     else if (!Net.seated) status = 'Joining...';
     else status = 'Waiting for ' + String(seats[0] ? seats[0].name : 'the host').replace(/&/g, '&&') + ' to start the game.';

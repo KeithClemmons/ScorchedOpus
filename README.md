@@ -103,21 +103,19 @@ join a Remastered game or the reverse. Everything else works as described below.
 - **From source:** open `index.html`, or serve the folder (`python tools/devserver.py 8124`,
   then visit http://localhost:8124).
 - Rebuild the single-file version after changing code: `node tools/build.js`. It also writes
-  `dist/index.html` (what a web host serves) and `dist/artifact.html` (for claude.ai pages);
-  those two are build output and aren't committed.
+  `dist/index.html` (what a web host serves), which is build output and isn't committed.
 
 Click the game once so it has keyboard focus. Sound starts after your first click or key press.
 
 ## Playing online
 
 Choose **Network...** on the main menu. One player hosts, and their browser runs the game.
-Everyone else joins and sees the same battle. There are four ways to connect:
+Everyone else joins and sees the same battle. There are three ways to connect:
 
 | Play via | Who can join | What you need |
 | --- | --- | --- |
 | **peer to peer** | Anyone with a copy of the game and the room code | Nothing to run. Browsers connect directly (WebRTC); the free public [PeerJS](https://peerjs.com) service only introduces them. |
 | **game server** | Anyone who can reach your server | Deploy to Cloudflare or run `server/server.js` (below). Everyone opens the page it serves and types the same room code. |
-| **claude.ai page room** | Anyone with the game's claude.ai page open | Share the page with **interact** or **edit** access. Viewers on a public link or signed out can't connect. |
 | **this browser** | Other tabs on the same computer | Nothing. Handy for trying it out. |
 
 **Peer to peer** works from any copy: GitHub Pages, any static web host, or the single file
@@ -134,7 +132,7 @@ choice for regular play.
 - **Start Game** begins play.
 
 Players on the same room code press **Join Game**. On a single room code the game is found
-automatically; on claude.ai you pick it from a list. Click your own tank in the lobby to change its icon.
+automatically; if several share it, you pick from a list. Click your own tank in the lobby to change its icon.
 
 In a network game:
 
@@ -343,7 +341,6 @@ Online play has to involve other machines:
   direct connections, PeerJS's relay passes the game traffic on.
 - **Game server:** whoever runs the server sees the IP addresses of everyone connected, as any
   web server does. The server stores nothing.
-- **claude.ai page room:** handled by claude.ai under its own terms.
 
 Whoever hosts a copy of the game (GitHub Pages, Cloudflare, your own server) also receives the
 usual web server logs from that host.

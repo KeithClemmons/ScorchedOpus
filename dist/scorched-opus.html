@@ -9688,7 +9688,6 @@ class StandingsScene {
 
    Transports all look like "a room": broadcast messages plus a small
    presence object per participant.
-     RoomTransport  - the claude.ai page room (everyone viewing the page)
      WsTransport    - server/server.js relay, rooms by code
      PeerTransport  - browser to browser (WebRTC), rooms by code, no server
      LocalTransport - BroadcastChannel between tabs of one browser
@@ -9933,51 +9932,6 @@ class PeerTransport {
   }
 }
 
-// the claude.ai page room: everyone viewing this page right now
-class RoomTransport {
-  // the page room carries 4 KiB per message and wants no more than a few dozen messages a second
-  constructor() { this.list = []; this.me = null; this.denied = false; this.maxMsg = 3500; this.minGap = 50; }
-  async connect() {
-    const c = window.claude;
-    const room = c && typeof c.use === 'function' ? await c.use('room') : null;
-    if (!room) throw new Error('Online play is not available on this view of the page.');
-    this.room = room;
-    this.unsubs = [
-      room.on('net', m => { if (m.sameTab || m.kind !== 'viewer') return; if (this.onmessage) this.onmessage(m.data, m.peer); }, e => this.fail(e)),
-      room.onPeers(ch => this.take(ch.peers), e => this.fail(e)),
-      room.onConnection(up => { if (this.onstatus) this.onstatus(up); }, e => this.fail(e))
-    ];
-    for (let i = 0; i < 60 && !this.me; i++) {
-      this.take(room.peers());
-      if (!this.me) await new Promise(r => setTimeout(r, 100));
-    }
-    if (!this.me) throw new Error('Could not join the room for this page.');
-  }
-  take(peers) {
-    const list = [];
-    for (const p of peers || []) {
-      if (p.sameTab) { this.me = p.peer; continue; }
-      if (p.kind !== 'viewer') continue;
-      list.push({ peer: p.peer, presence: p.presence || {} });
-    }
-    this.list = list;
-    if (this.onpeers) this.onpeers();
-  }
-  fail(e) {
-    if (this.onstatus) this.onstatus(false);
-    if (e && (e.code === 'not_permitted')) this.denied = true;
-  }
-  peers() { return this.list; }
-  emit(data) {
-    this.room.emit('net', data).catch(e => { if (e && e.code === 'not_permitted') { this.denied = true; Toast.show('You need interact access to this page to play online.'); } });
-  }
-  presence(patch) { this.room.presence(patch).catch(() => { /* over the limit or disconnected */ }); }
-  close() {
-    for (const u of this.unsubs || []) { try { u(); } catch (e) { /* ignore */ } }
-    try { this.room.presence({ game: null, aim: null, name: null, v: null }).catch(() => {}); } catch (e) { /* ignore */ }
-  }
-}
-
 /* ------------------------------------------------ the protocol */
 const Net = {
   online: false, role: null, me: null, kind: null, code: null, tr: null, connected: false,
@@ -9993,20 +9947,16 @@ const Net = {
   isClient() { return this.online && this.role === 'client'; },
   kindLabel(k) {
     k = k || this.kind;
-    return k === 'room' ? 'claude.ai page room' : k === 'ws' ? 'game server' : k === 'peer' ? 'peer to peer' : 'this browser';
+    return k === 'ws' ? 'game server' : k === 'peer' ? 'peer to peer' : 'this browser';
   },
-  // ways to connect from here (a page inside claude.ai cannot open sockets to other hosts)
+  // ways to connect from here
   available() {
-    const k = [];
-    const inClaude = !!(window.claude && typeof window.claude.use === 'function');
-    if (inClaude) k.push('room');
     // a site with our relay behind it offers that first; a plain static copy (GitHub Pages, a file)
     // has no server, so peer to peer comes first there
-    else if (this.relayHere()) k.push('ws', 'peer');
-    else k.push('peer', 'ws');
+    const k = this.relayHere() ? ['ws', 'peer'] : ['peer', 'ws'];
     // tabs of one browser: only offered when testing locally - on a real website it only
     // strands friends in a room nobody else can reach
-    if (inClaude || !this.hosted()) k.push('local');
+    if (!this.hosted()) k.push('local');
     return k;
   },
   // is this page served by a game server (server/server.js or the Cloudflare Worker)? Static hosts
@@ -10025,7 +9975,7 @@ const Net = {
 
   async open(kind, o) {
     this.close();
-    const tr = kind === 'room' ? new RoomTransport() : kind === 'ws' ? new WsTransport(o.url, o.code) : kind === 'peer' ? new PeerTransport(o.code) : new LocalTransport(o.code);
+    const tr = kind === 'ws' ? new WsTransport(o.url, o.code) : kind === 'peer' ? new PeerTransport(o.code) : new LocalTransport(o.code);
     tr.onmessage = (m, from) => { try { this.onMessage(m, from); } catch (e) { console.error(e); } };
     tr.onpeers = () => {};
     tr.onstatus = up => { this.connected = up; };
@@ -10501,11 +10451,9 @@ class NetScene {
     const roomL = d.text('&Room code:', 10, 71);
     const roomF = d.textField(f, 'code', fx, 68, 60, 8, () => { f.code = cleanCode(f.code); });
     roomF.hot = 'r';
-    roomL.hidden = roomF.hidden = () => f.kind === 'room';
-    d.button('Ne&w', fx + 64, 68, 36, 12, () => { f.code = rid(4); }, { hidden: () => f.kind === 'room' });
+    d.button('Ne&w', fx + 64, 68, 36, 12, () => { f.code = rid(4); });
     d.add({ x: 10, y: 86, w: 0, h: 0, kind: 'label', draw: s => {
       const help = {
-        room: 'You play with people who have this page open. Friends need access to the page (interact or edit) - share it from the Share menu.',
         ws: Net.hosted() && Net.relayHere()
           ? 'Host: press Host Game and tell your friends the room code. Friends: open this same site, type that room code, then press Join Game.'
           : 'Everyone connects to the same game server and room code. Run server/server.js (npm start) somewhere your friends can reach.',
@@ -10530,7 +10478,7 @@ class NetScene {
     f.name = cleanName(f.name);
     f.code = cleanCode(f.code);
     if (!f.name) { this.status = 'Type your name first.'; Sound.error(); return; }
-    if (f.kind !== 'room' && f.code.length < 3) { this.status = 'The room code needs at least 3 letters.'; Sound.error(); return; }
+    if (f.code.length < 3) { this.status = 'The room code needs at least 3 letters.'; Sound.error(); return; }
     if (f.kind === 'ws' && !/^wss?:\/\/.+/i.test(f.url)) { this.status = 'The server address starts with ws:// or wss://'; Sound.error(); return; }
     Store.set('scorch.net', f);
     this.busy = true; this.status = 'Connecting...';
@@ -10554,7 +10502,7 @@ class NetScene {
 
 /* ------------------------------------------------ find a game to join */
 class JoinScene {
-  constructor() { this.btns = []; this.t = 0; this.auto = Net.kind !== 'room'; }
+  constructor() { this.btns = []; this.t = 0; this.auto = true; }
   enter() { UI.clear(); }
   update(dt) {
     this.t += dt;
@@ -10581,13 +10529,13 @@ class JoinScene {
     const x = Math.floor((Screen.UW - W) / 2), y = Math.floor((Screen.UH - H) / 2);
     frame(s, x, y, W, H);
     Font.center(s, 'Join a Network Game', x + W / 2, y + 6, UIC.text);
-    Font.center(s, Net.kind === 'room' ? 'Games on this page' : 'Room ' + Net.code + ' (' + Net.kindLabel() + ')', x + W / 2, y + 18, UIC.dis);
+    Font.center(s, 'Room ' + Net.code + ' (' + Net.kindLabel() + ')', x + W / 2, y + 18, UIC.dis);
     this.btns = [];
     const games = Net.games();
     const open = games.filter(g => g.open);
     if (!open.length) {
       const lines = games.length ? ['The games here have already started.', 'Wait for the next one, or host your own.']
-        : ['Looking for games' + '...'.slice(0, 1 + Math.floor(this.t * 2) % 3), Net.kind === 'room' ? 'Ask a friend to press Host Game here.' : 'Ask the host for the room code.']
+        : ['Looking for games' + '...'.slice(0, 1 + Math.floor(this.t * 2) % 3), 'Ask the host for the room code.']
           .concat(Net.kind === 'ws' && this.t > 6 ? ['', 'Nothing yet in room ' + Net.code + '.', 'Check the host pressed Host Game with this', 'same room code, on this same website.'] : [])
           .concat(Net.kind === 'peer' && this.t > 6 ? ['', 'Nothing yet in room ' + Net.code + '.', 'Check the host picked peer to peer and', 'pressed Host Game with this same room code.'] : [])
           .concat(Net.kind === 'local' && this.t > 4 ? ['', '"This browser" only finds tabs on this computer.', 'To play a friend, go Back and pick game server.'] : []);
@@ -10672,7 +10620,7 @@ class LobbyScene {
     const host = Net.isHost(), seats = this.seats(), cfg = this.cfg();
     frame(s, x, y, W, H);
     Font.center(s, 'Network Game Lobby', x + W / 2, y + 6, UIC.text);
-    const where = Net.kind === 'room' ? 'Playing through this page (claude.ai)' : 'Room ' + Net.code + ' - ' + Net.kindLabel();
+    const where = 'Room ' + Net.code + ' - ' + Net.kindLabel();
     Font.center(s, where, x + W / 2, y + 17, UIC.blue);
     this.btns = [];
     const teams = cfg.teams && cfg.teams !== 'NONE';
@@ -10731,7 +10679,7 @@ class LobbyScene {
     }
     // status + buttons
     let status;
-    if (host) status = seats.length < 2 ? 'Add computers or wait for friends to join.' : (Net.kind === 'room' ? 'Friends can join from this page.' : 'Friends join with room code ' + Net.code + '.');
+    if (host) status = seats.length < 2 ? 'Add computers or wait for friends to join.' : 'Friends join with room code ' + Net.code + '.';
     else if (!Net.lobby) status = 'Contacting the host...';
     else if (!Net.seated) status = 'Joining...';
     else status = 'Waiting for ' + String(seats[0] ? seats[0].name : 'the host').replace(/&/g, '&&') + ' to start the game.';

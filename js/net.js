@@ -10,7 +10,6 @@
 
    Transports all look like "a room": broadcast messages plus a small
    presence object per participant.
-     RoomTransport  - the claude.ai page room (everyone viewing the page)
      WsTransport    - server/server.js relay, rooms by code
      PeerTransport  - browser to browser (WebRTC), rooms by code, no server
      LocalTransport - BroadcastChannel between tabs of one browser
@@ -255,51 +254,6 @@ class PeerTransport {
   }
 }
 
-// the claude.ai page room: everyone viewing this page right now
-class RoomTransport {
-  // the page room carries 4 KiB per message and wants no more than a few dozen messages a second
-  constructor() { this.list = []; this.me = null; this.denied = false; this.maxMsg = 3500; this.minGap = 50; }
-  async connect() {
-    const c = window.claude;
-    const room = c && typeof c.use === 'function' ? await c.use('room') : null;
-    if (!room) throw new Error('Online play is not available on this view of the page.');
-    this.room = room;
-    this.unsubs = [
-      room.on('net', m => { if (m.sameTab || m.kind !== 'viewer') return; if (this.onmessage) this.onmessage(m.data, m.peer); }, e => this.fail(e)),
-      room.onPeers(ch => this.take(ch.peers), e => this.fail(e)),
-      room.onConnection(up => { if (this.onstatus) this.onstatus(up); }, e => this.fail(e))
-    ];
-    for (let i = 0; i < 60 && !this.me; i++) {
-      this.take(room.peers());
-      if (!this.me) await new Promise(r => setTimeout(r, 100));
-    }
-    if (!this.me) throw new Error('Could not join the room for this page.');
-  }
-  take(peers) {
-    const list = [];
-    for (const p of peers || []) {
-      if (p.sameTab) { this.me = p.peer; continue; }
-      if (p.kind !== 'viewer') continue;
-      list.push({ peer: p.peer, presence: p.presence || {} });
-    }
-    this.list = list;
-    if (this.onpeers) this.onpeers();
-  }
-  fail(e) {
-    if (this.onstatus) this.onstatus(false);
-    if (e && (e.code === 'not_permitted')) this.denied = true;
-  }
-  peers() { return this.list; }
-  emit(data) {
-    this.room.emit('net', data).catch(e => { if (e && e.code === 'not_permitted') { this.denied = true; Toast.show('You need interact access to this page to play online.'); } });
-  }
-  presence(patch) { this.room.presence(patch).catch(() => { /* over the limit or disconnected */ }); }
-  close() {
-    for (const u of this.unsubs || []) { try { u(); } catch (e) { /* ignore */ } }
-    try { this.room.presence({ game: null, aim: null, name: null, v: null }).catch(() => {}); } catch (e) { /* ignore */ }
-  }
-}
-
 /* ------------------------------------------------ the protocol */
 const Net = {
   online: false, role: null, me: null, kind: null, code: null, tr: null, connected: false,
@@ -315,20 +269,16 @@ const Net = {
   isClient() { return this.online && this.role === 'client'; },
   kindLabel(k) {
     k = k || this.kind;
-    return k === 'room' ? 'claude.ai page room' : k === 'ws' ? 'game server' : k === 'peer' ? 'peer to peer' : 'this browser';
+    return k === 'ws' ? 'game server' : k === 'peer' ? 'peer to peer' : 'this browser';
   },
-  // ways to connect from here (a page inside claude.ai cannot open sockets to other hosts)
+  // ways to connect from here
   available() {
-    const k = [];
-    const inClaude = !!(window.claude && typeof window.claude.use === 'function');
-    if (inClaude) k.push('room');
     // a site with our relay behind it offers that first; a plain static copy (GitHub Pages, a file)
     // has no server, so peer to peer comes first there
-    else if (this.relayHere()) k.push('ws', 'peer');
-    else k.push('peer', 'ws');
+    const k = this.relayHere() ? ['ws', 'peer'] : ['peer', 'ws'];
     // tabs of one browser: only offered when testing locally - on a real website it only
     // strands friends in a room nobody else can reach
-    if (inClaude || !this.hosted()) k.push('local');
+    if (!this.hosted()) k.push('local');
     return k;
   },
   // is this page served by a game server (server/server.js or the Cloudflare Worker)? Static hosts
@@ -347,7 +297,7 @@ const Net = {
 
   async open(kind, o) {
     this.close();
-    const tr = kind === 'room' ? new RoomTransport() : kind === 'ws' ? new WsTransport(o.url, o.code) : kind === 'peer' ? new PeerTransport(o.code) : new LocalTransport(o.code);
+    const tr = kind === 'ws' ? new WsTransport(o.url, o.code) : kind === 'peer' ? new PeerTransport(o.code) : new LocalTransport(o.code);
     tr.onmessage = (m, from) => { try { this.onMessage(m, from); } catch (e) { console.error(e); } };
     tr.onpeers = () => {};
     tr.onstatus = up => { this.connected = up; };
