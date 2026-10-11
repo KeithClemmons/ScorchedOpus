@@ -18,6 +18,27 @@ No libraries are used, and no build step is required.
 This is an unofficial fan tribute. It is not affiliated with or endorsed by Wendell Hicken,
 and it contains none of the original game's code or files.
 
+![Title screen: the menu beside a live sunset valley](docs/screenshots/title.jpg)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/battle.jpg" alt="A Remastered battle at sunset, a missile in flight and fireballs going off"></td>
+    <td width="50%"><img src="docs/screenshots/classic.png" alt="The same game in the original 1.5 VGA look, with scanned mountains and a red fireball"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Remastered</b></td>
+    <td align="center"><b>Classic look (press F2)</b></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/shop.png" alt="The shop: weapons with prices, bundle sizes and descriptions"></td>
+    <td width="50%"><img src="docs/screenshots/tank-control.jpg" alt="The Tank Control panel: power, parachutes, shields, guidance, triggers and fuel"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>The shop</b></td>
+    <td align="center"><b>Tank Control panel</b></td>
+  </tr>
+</table>
+
 ## What's new in Remastered
 
 **Graphics**
