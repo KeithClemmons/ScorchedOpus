@@ -1,5 +1,7 @@
 # Scorched Opus Remastered
 
+![Title screen: the menu beside a live sunset valley](docs/screenshots/title.jpg)
+
 The **Remastered** edition of Scorched Opus, a browser remake of **Scorched Earth 1.5**
 ("The Mother of All Games", Wendell Hicken, 1991–1995). The rules are the same: the 33 original
 weapons and 15 accessories, the computer opponents, every option from the original menus, and
@@ -17,8 +19,6 @@ No libraries are used, and no build step is required.
 
 This is an unofficial fan tribute. It is not affiliated with or endorsed by Wendell Hicken,
 and it contains none of the original game's code or files.
-
-![Title screen: the menu beside a live sunset valley](docs/screenshots/title.jpg)
 
 <table>
   <tr>
