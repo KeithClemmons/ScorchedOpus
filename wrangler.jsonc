@@ -1,0 +1,21 @@
+// Cloudflare Workers deployment: the game (built into dist/) plus the multiplayer relay.
+// `npx wrangler dev` runs it locally; `npx wrangler deploy` (or a push, once the repo is
+// connected in the Cloudflare dashboard) builds and publishes it.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "scorched-opus",
+  "main": "worker/index.js",
+  "workers_dev": true,        // serve at scorched-opus.<subdomain>.workers.dev
+  "preview_urls": true,       // and a preview URL for each non-production branch build
+  // your own address too, if you like (the domain must be on Cloudflare in the same account;
+  // Cloudflare adds the DNS record and certificate on deploy):
+  // "routes": [{ "pattern": "scorched.example.com", "custom_domain": true }],
+  "compatibility_date": "2025-12-01",
+  "build": { "command": "node tools/build.js" },
+  "assets": { "directory": "./dist", "binding": "ASSETS" },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "observability": { "enabled": false }
+}

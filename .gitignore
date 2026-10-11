@@ -1,0 +1,9 @@
+node_modules/
+.claude/
+*.log
+.wrangler/
+.dev.vars
+# build output (node tools/build.js); only the standalone dist/scorched-opus.html is committed
+dist/index.html
+dist/artifact.html
+dist/.assetsignore

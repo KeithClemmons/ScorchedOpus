@@ -1,0 +1,19 @@
+{
+  "name": "scorched-opus-remastered",
+  "version": "2.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Scorched Earth 1.5 remake with modern graphics, new weapons and online multiplayer",
+  "scripts": {
+    "start": "node server/server.js",
+    "build": "node tools/build.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "wrangler": "^4.137.0"
+  }
+}
