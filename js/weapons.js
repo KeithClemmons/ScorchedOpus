@@ -340,9 +340,13 @@ class Shot {
         // 6-9 bomblets go up from there about once a second
         Battle.spawn(new Explosion(x, y, srand(6, 18) * sc, { dmg: 45, owner: o, primary: true, type: 'funky', color: vgaq(hsl(rand(0, 360), 1, 0.55)) }));
         const n = sirand(6, 9), R = wp.r * sc;
+        // a fast shell digs a few rows in before it registers the hit: the bomblets go up from the
+        // surface above it (starting underground, they all burst at once in the same spot)
+        let gy = Math.floor(y);
+        while (gy > World.top && World.isLand(x, gy)) gy--;
         for (let i = 0; i < n; i++) {
           const ang = srand(20, 160) * DEG, v = Phys.vmax() * srand(0.12, 0.3) * Math.sqrt(R / 80);
-          const b = new Bomblet(o, x, y - 2 * World.ay, Math.cos(ang) * v, -Math.sin(ang) * v * World.ay, srand(15, 22) * sc, wp.dmg, x, R);
+          const b = new Bomblet(o, x, gy - World.ay, Math.cos(ang) * v, -Math.sin(ang) * v * World.ay, srand(15, 22) * sc, wp.dmg, x, R);
           b.delay = 0.3 + i * 0.95;
           Battle.spawn(b);
         }

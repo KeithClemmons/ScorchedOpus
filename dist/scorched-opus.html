@@ -4586,9 +4586,13 @@ class Shot {
         // 6-9 bomblets go up from there about once a second
         Battle.spawn(new Explosion(x, y, srand(6, 18) * sc, { dmg: 45, owner: o, primary: true, type: 'funky', color: vgaq(hsl(rand(0, 360), 1, 0.55)) }));
         const n = sirand(6, 9), R = wp.r * sc;
+        // a fast shell digs a few rows in before it registers the hit: the bomblets go up from the
+        // surface above it (starting underground, they all burst at once in the same spot)
+        let gy = Math.floor(y);
+        while (gy > World.top && World.isLand(x, gy)) gy--;
         for (let i = 0; i < n; i++) {
           const ang = srand(20, 160) * DEG, v = Phys.vmax() * srand(0.12, 0.3) * Math.sqrt(R / 80);
-          const b = new Bomblet(o, x, y - 2 * World.ay, Math.cos(ang) * v, -Math.sin(ang) * v * World.ay, srand(15, 22) * sc, wp.dmg, x, R);
+          const b = new Bomblet(o, x, gy - World.ay, Math.cos(ang) * v, -Math.sin(ang) * v * World.ay, srand(15, 22) * sc, wp.dmg, x, R);
           b.delay = 0.3 + i * 0.95;
           Battle.spawn(b);
         }
@@ -9693,7 +9697,7 @@ class StandingsScene {
      LocalTransport - BroadcastChannel between tabs of one browser
    ===================================================================== */
 
-const NET_V = 29;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second
+const NET_V = 30;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second, v30 funky bomblets start from the surface
 const GAME_CMDS = new Set(['start', 'shop', 'shopwait', 'round', 'roundover', 'gameover', 'setai', 'msg']);
 // options that shape the shared game (sound, pointer and the like stay personal)
 const SYNC_KEYS = ['rounds', 'graphicsMode', 'firingDelay', 'fallingDelay', 'interestRate', 'cashAtStart', 'computersBuy',

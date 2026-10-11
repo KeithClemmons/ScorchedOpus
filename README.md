@@ -37,6 +37,14 @@ and it contains none of the original game's code or files.
     <td align="center"><b>The shop</b></td>
     <td align="center"><b>Tank Control panel</b></td>
   </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/funky.jpg" alt="A Funky Bomb volley in the Remastered look: bomblet blasts glowing in different colours"></td>
+    <td width="50%"><img src="docs/screenshots/funky-classic.png" alt="A Funky Bomb volley in the classic look: overlapping ringed blasts, each in its own colour"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Funky Bomb volley</b></td>
+    <td align="center"><b>Funky Bomb volley, classic look</b></td>
+  </tr>
 </table>
 
 ## What's new in Remastered
