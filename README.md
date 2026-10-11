@@ -99,8 +99,7 @@ join a Remastered game or the reverse. Everything else works as described below.
 
 - **Online:** https://keithclemmons.github.io/ScorchedOpus/
 - **Quickest offline:** open `dist/scorched-opus.html` (a single self-contained file) in a browser.
-  The web fonts load from Google Fonts when you're online; offline the game uses your system
-  fonts.
+  It works offline too; its fonts are built in.
 - **From source:** open `index.html`, or serve the folder (`python tools/devserver.py 8124`,
   then visit http://localhost:8124).
 - Rebuild the single-file version after changing code: `node tools/build.js`. It also writes
@@ -330,9 +329,32 @@ Bug reports and pull requests are welcome on GitHub. A few things worth knowing:
   the quickest way to check that a change keeps network games in sync.
 - Run `node tools/build.js` and check the single-file build loads before sending a change.
 
+## Privacy
+
+The game keeps no accounts and sends no analytics. Settings and saved games stay in your
+browser's local storage. Everything it needs, including its fonts, comes with it, so playing
+offline or on your own server contacts nobody else.
+
+Online play has to involve other machines:
+
+- **Peer to peer:** your browser registers with the free public [PeerJS](https://peerjs.com)
+  service so other players can find it, and connects directly to the other players' browsers.
+  Both necessarily see your IP address, as with any direct connection. If your network blocks
+  direct connections, PeerJS's relay passes the game traffic on.
+- **Game server:** whoever runs the server sees the IP addresses of everyone connected, as any
+  web server does. The server stores nothing.
+- **claude.ai page room:** handled by claude.ai under its own terms.
+
+Whoever hosts a copy of the game (GitHub Pages, Cloudflare, your own server) also receives the
+usual web server logs from that host.
+
 ## License
 
 MIT (see [LICENSE](LICENSE)).
+
+Bundled third-party files: the fonts Chakra Petch and Russo One in `fonts/` (SIL Open Font
+License 1.1, see `fonts/OFL-*.txt`) and PeerJS 1.5.4 in `vendor/` (MIT, see
+`vendor/peerjs-LICENSE.txt`).
 
 Scorched Earth is © 1991–1995 Wendell Hicken. Scorched Opus is an unofficial fan tribute,
 not affiliated with or endorsed by him, and contains none of the original game's code or

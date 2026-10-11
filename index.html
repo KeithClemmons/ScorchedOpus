@@ -4,10 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Scorched Opus Remastered</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Russo+One&display=swap">
 <style>
+  /* Chakra Petch and Russo One, served from our own fonts/ folder (SIL Open Font License, see
+     fonts/OFL-*.txt) so no visitor data goes to a font service; the single-file build embeds them */
+  @font-face { font-family: 'Chakra Petch'; font-style: normal; font-weight: 500; font-display: swap;
+    src: url(fonts/ChakraPetch-500-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Chakra Petch'; font-style: normal; font-weight: 500; font-display: swap;
+    src: url(fonts/ChakraPetch-500-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Chakra Petch'; font-style: normal; font-weight: 600; font-display: swap;
+    src: url(fonts/ChakraPetch-600-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Chakra Petch'; font-style: normal; font-weight: 600; font-display: swap;
+    src: url(fonts/ChakraPetch-600-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Chakra Petch'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url(fonts/ChakraPetch-700-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Chakra Petch'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url(fonts/ChakraPetch-700-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Russo One'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url(fonts/RussoOne-400-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Russo One'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url(fonts/RussoOne-400-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
   :root { color-scheme: dark; --ground: #000000; }
   html, body { height: 100%; margin: 0; background: var(--ground); overflow: hidden; }
   body { display: flex; align-items: center; justify-content: center; }
@@ -21,6 +36,7 @@
 <body>
 <canvas id="screen" tabindex="0" aria-label="Scorched Opus Remastered - artillery game screen"></canvas>
 <!-- build:scripts -->
+<script src="vendor/peerjs.min.js"></script>
 <script src="js/core.js"></script>
 <script src="js/font.js"></script>
 <script src="js/icons.js"></script>

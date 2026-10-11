@@ -122,22 +122,13 @@ class WsTransport {
   close() { clearInterval(this.ka); try { this.ws.close(); } catch (e) { /* ignore */ } }
 }
 
-// peer to peer (WebRTC through PeerJS): no game server at all. The free public PeerJS service only
-// introduces the players (it also lends a relay to players on strict networks); game messages then
-// go browser to browser. The first browser in a room code becomes its hub: everyone else connects
-// to it, and it passes messages and presence on, so the room behaves like the server's.
-const PEERJS_URL = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
+// peer to peer (WebRTC through PeerJS, bundled in vendor/): no game server at all. The free public
+// PeerJS service only introduces the players (it also lends a relay to players on strict networks);
+// game messages then go browser to browser. The first browser in a room code becomes its hub:
+// everyone else connects to it, and it passes messages and presence on, so the room behaves like
+// the server's.
 function loadPeerJs() {
-  if (window.Peer) return Promise.resolve();
-  if (loadPeerJs.p) return loadPeerJs.p;
-  loadPeerJs.p = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = PEERJS_URL; s.async = true;
-    s.onload = () => (window.Peer ? resolve() : reject(new Error('Peer to peer could not start.')));
-    s.onerror = () => { loadPeerJs.p = null; reject(new Error('Could not load peer to peer (are you online?).')); };
-    document.head.appendChild(s);
-  });
-  return loadPeerJs.p;
+  return window.Peer ? Promise.resolve() : Promise.reject(new Error('Peer to peer is missing from this copy of the game.'));
 }
 class PeerTransport {
   constructor(code) {
