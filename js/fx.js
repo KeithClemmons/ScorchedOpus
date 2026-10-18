@@ -251,6 +251,8 @@ const Fx = {
     if (e instanceof Shot) {
       const s = this.state(e);
       if (e.delay > 0 || !s.trail) return;
+      // a portal moved it: start the trail again rather than streak across the sky
+      if ((e.warps || 0) !== (s.warps || 0)) { s.warps = e.warps; s.trail = []; }
       s.trail.push(e.x, e.y);
       if (s.trail.length > 36) s.trail.splice(0, 2);
       const k = e.wp.kind;
@@ -388,6 +390,7 @@ const Fx = {
     ctx.translate(Gfx.shakeX, Gfx.shakeY);
     this.drawTrace(ctx);
     if (B) this.drawWalls(ctx, B.walls);
+    if (B) this.drawGates(ctx, B);
     this.drawParts(ctx, 0);
     if (W.skyType === 'STORMY') this.drawRain(ctx, step, B ? B.wind : 0);
     if (B) {
@@ -440,6 +443,57 @@ const Fx = {
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.45)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
     if (dim > 0) { ctx.fillStyle = 'rgba(4,6,12,' + dim + ')'; ctx.fillRect(0, 0, w, h); }
+  },
+  // Sky Gates: glowing frames with their effect on a tag; portals are rings, blue in and orange out
+  drawGates(ctx, B) {
+    const list = B.gates;
+    if (!list || !list.length) return;
+    const now = performance.now(), u = Math.min(Gfx.sx, Gfx.sy);
+    ctx.save();
+    ctx.globalAlpha = 1;
+    for (const g of list) {
+      const K = GATE_KINDS[g.k], col = K.col;
+      const lit = g.flash ? clamp(1 - (now - g.flash) / 500, 0, 1) : 0;
+      const X = Gfx.X(g.x), Y = Gfx.Y(g.y), H = g.h * Gfx.sy, W = Math.max(8 * u, 6 * Gfx.sx);
+      const pulse = 0.75 + 0.25 * Math.sin(Gfx.t * 3 + g.x);
+      ctx.globalCompositeOperation = 'lighter';
+      this.drawGlow(ctx, X, Y, H * 1.1, col, 0.18 + 0.4 * lit);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      if (g.k === 'pin' || g.k === 'pout') {
+        // a ring with a swirl turning inside it
+        ctx.lineWidth = Math.max(2, 2.2 * u);
+        ctx.strokeStyle = rgba(mix3(col, WHITE3, 0.25 + 0.5 * lit), 0.95);
+        ctx.beginPath(); ctx.ellipse(X, Y, W * 0.9, H, 0, 0, TAU); ctx.stroke();
+        ctx.fillStyle = rgba(col, 0.16 + 0.2 * lit); ctx.fill();
+        ctx.lineWidth = Math.max(1, 1.2 * u); ctx.strokeStyle = rgba(col, 0.7 * pulse);
+        const spin = Gfx.t * (g.k === 'pin' ? 2.4 : -2.4);
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(X, Y, W * 0.55, H * 0.62, 0, spin + i * 2.1, spin + i * 2.1 + 1.2); ctx.stroke(); }
+      } else {
+        // a window frame
+        VUI.rr.call({ ctx }, X - W / 2, Y - H, W, H * 2, Math.min(W / 2, 3 * u));
+        ctx.fillStyle = rgba(col, 0.12 + 0.25 * lit); ctx.fill();
+        ctx.lineWidth = Math.max(2.5, 2.4 * u);
+        ctx.strokeStyle = rgba(mix3(col, WHITE3, 0.2 + 0.6 * lit), 0.9 * pulse + 0.1);
+        ctx.stroke();
+        // window bars
+        ctx.lineWidth = Math.max(1, u);
+        ctx.beginPath(); ctx.moveTo(X, Y - H + 2 * u); ctx.lineTo(X, Y + H - 2 * u); ctx.moveTo(X - W / 2 + 2 * u, Y); ctx.lineTo(X + W / 2 - 2 * u, Y);
+        ctx.strokeStyle = rgba(col, 0.45);
+        ctx.stroke();
+      }
+      // the tag
+      const fs = Math.max(12, 10 * u);
+      ctx.font = '700 ' + fs.toFixed(1) + 'px ' + FONT_UI;
+      const tw = ctx.measureText(K.label).width, ph = fs * 1.35, pw = tw + fs * 0.9, py = Y - H - ph - 3 * u;
+      VUI.rr.call({ ctx }, X - pw / 2, py, pw, ph, ph / 2);
+      ctx.fillStyle = 'rgba(8,10,18,0.78)'; ctx.fill();
+      ctx.lineWidth = Math.max(1, u * 0.8); ctx.strokeStyle = rgba(col, 0.9); ctx.stroke();
+      ctx.fillStyle = rgba(mix3(col, WHITE3, 0.35), 1);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(K.label, X, py + ph / 2 + u * 0.3);
+    }
+    ctx.textAlign = 'left';
+    ctx.restore();
   },
   drawWalls(ctx, walls) {
     const col = { CONCRETE: [190, 190, 200], PADDED: [120, 170, 255], RUBBER: [90, 230, 120], SPRING: [255, 220, 80], WRAP: [200, 120, 255] }[walls];

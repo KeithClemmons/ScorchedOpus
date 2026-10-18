@@ -147,6 +147,7 @@ class Shot {
       }
       const ox = this.x, oy = this.y;
       this.x += this.vx * h; this.y += this.vy * h;
+      Gates.cross(this, ox, oy);
       // MIRV / Death's Head split at apogee
       if ((this.wp.kind === 'mirv') && !this.sub && !this.split && this.vy >= 0 && this.age > 0.05) { this.doSplit(); return false; }
       const wr = applyWalls(this, this.walls);
@@ -413,6 +414,9 @@ class Shot {
 class Explosion {
   constructor(x, y, r, o) {
     o = o || {};
+    // Sky Gates: x damage, x blast area
+    const M = Battle.multNow();
+    if (M !== 1) { r *= Math.sqrt(M); if (o.dmg) o = Object.assign({}, o, { dmg: o.dmg * M }); }
     this.x = x; this.y = y; this.r = Math.max(2, r); this.o = o;
     this.type = o.type || 'normal';
     this.t = 0;
@@ -741,7 +745,9 @@ class Bomblet {
     while (rem > 1e-6) {
       const sp = Math.max(Math.abs(this.vx), Math.abs(this.vy), 1), h = Math.min(rem, 0.9 / sp);
       rem -= h; this.age += h;
+      const ox = this.x, oy = this.y;
       this.vy += g * h; this.x += this.vx * h; this.y += this.vy * h;
+      Gates.cross(this, ox, oy);
       if ((this.trailT -= h) <= 0) { this.trailT = 0.012; this.trail.push(Math.floor(this.x), Math.floor(this.y)); }
       if (Math.abs(this.x - this.ox) > this.R) this.vx *= -0.6;  // stays near where it hit
       let hit = this.y >= World.H - 1 || World.isLand(this.x, this.y) || this.age > 3;
@@ -859,6 +865,7 @@ class DigCollapse {
 }
 class Tunneler {
   constructor(owner, wp, x, y, ang, len, width, dir, delay, dig, boom) {
+    len *= Battle.multNow();
     this.owner = owner; this.wp = wp; this.x = x; this.y = y; this.ang = ang; this.len = len;
     this.width = width; this.dist = 0; this.air = 0; this.delay = delay;
     this.dig = dig || null; this.forks = 0; this.boom = boom || 0;
@@ -944,6 +951,7 @@ function waterFill(x, y, amount) {
 }
 class LiquidDirt {
   constructor(x, y, amount) {
+    amount = Math.max(1, Math.round(amount * Battle.multNow()));
     this.left = amount; this.t = 0; this.dur = 0.1;
     this.per = Math.max(1, Math.ceil(amount / (this.dur * 60)));
     const W = World.W;
@@ -1002,6 +1010,8 @@ class LiquidDirt {
 /* ------------------------------ liquids: napalm & liquid dirt ------------------------------ */
 class Liquid {
   constructor(x, y, o) {
+    const M = Battle.multNow();
+    if (M !== 1) o = Object.assign({}, o, { amount: Math.max(1, Math.round(o.amount * M)) });
     this.o = o; this.owner = o.owner;
     this.napalm = o.napalm;
     this.parts = [];
@@ -1161,6 +1171,7 @@ class Liquid {
 // a moment and falls as ordinary dirt
 class DirtSpray {
   constructor(x, y, r, spread, mult) {
+    r *= Math.sqrt(Battle.multNow());
     this.x = Math.round(x); this.y = Math.floor(World.isLand(x, y) ? y - World.ay : y);
     this.h = r;                                   // height, in columns
     this.slope = Math.tan(spread * DEG);          // half-width per column of height
@@ -1206,6 +1217,7 @@ class DirtSpray {
 // fall once it has gone. Both stages take time in proportion to the area they cover.
 class RiotWedge {
   constructor(x, y, r, a0, a1) {
+    r *= Math.sqrt(Battle.multNow());
     this.x = x; this.y = y; this.r = r; this.a0 = a0; this.a1 = a1;
     this.full = a1 - a0 >= 359;
     const area = r * r * (this.full ? 360 : a1 - a0);

@@ -78,6 +78,8 @@ const Battle = {
     this.entities = []; this.balloons = []; this.deaths = []; this.dyingNow = null;
     this.tanks = Game.players.map(p => new Tank(p));
     this.placeTanks();
+    // Sky Gates: laid out from the shared seeded numbers, so every machine agrees
+    this.gates = Cfg.skyGates !== 'OFF' ? Gates.place(srand) : [];
     this.orderTanks();
     this.turnIdx = -1; this.cur = null; this.plan = null; this.pendingTurn = null;
     this.syncWait = new Set(); this.syncShots = []; this.adWait = new Set(); this.hold = null;
@@ -164,7 +166,17 @@ const Battle = {
     const d = Cfg.firingDelay;
     return clamp(130 / Math.max(4, d), 0.25, 30);
   },
-  spawn(e) { this.entities.push(e); EventLog.spawned(e); return e; },
+  spawn(e) {
+    // whatever a projectile spawns (bomblets, warheads, hops, its blast) carries its Sky Gate multiplier
+    const p = this.curEnt;
+    if (p && p !== e) {
+      if (p.mult && p.mult !== 1 && e.mult === undefined) e.mult = p.mult;
+      if (p.used && !e.used && (e instanceof Shot || e instanceof Bomblet)) e.used = new Set(p.used);
+    }
+    this.entities.push(e); EventLog.spawned(e); return e;
+  },
+  // the Sky Gate multiplier for things being made right now
+  multNow() { return (this.curEnt && this.curEnt.mult) || 1; },
   terrainChanged() { /* dirt settles and tanks fall in simTick() */ },
   buried(t) {
     for (const a of [45, 90, 135]) {
@@ -557,8 +569,10 @@ const Battle = {
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
       const scaled = e instanceof Shot || e instanceof Bomblet || e instanceof Roller || e instanceof Tunneler || e instanceof DirtSpray;
+      this.curEnt = e;
       if (!e.update(TICK * (scaled ? ts : 1))) e._dead = true;
     }
+    this.curEnt = null;
     if (this.entities.some(e => e._dead)) this.entities = this.entities.filter(e => !e._dead);
     World.settle(Math.max(2, Math.round(4 * World.H / 480)));
     this.updateFalling(TICK);
@@ -607,6 +621,7 @@ const Battle = {
     const client = Net.isClient();
     switch (c.c) {
       case 'env': this.wind = c.wind; this.walls = c.walls; break;
+      case 'gates': this.gates = Gates.clean(c.g); break;
       case 'weather':
         if (c.kind === 'lightning') this.spawn(new Lightning(c.x));
         else this.spawn(new Meteor(c.x, c.vx));
@@ -884,6 +899,8 @@ const Battle = {
     if (Cfg.effectOfWalls === 'ERRATIC') walls = pick(WALL_TYPES);
     if (this.turnCount > 1) wind = this.rollWind(this.wind);
     if (walls !== this.walls || wind !== this.wind) this.act({ c: 'env', wind, walls });
+    // Gates Move: SHUFFLE - the host lays the gates out again for every turn
+    if (Cfg.skyGates !== 'OFF' && Cfg.gateMotion === 'SHUFFLE' && this.turnCount > 1) this.act({ c: 'gates', g: Gates.place(rand) });
     const w = this.rollWeather();
     if (w) { this.act(Object.assign({ c: 'weather' }, w)); return true; }
     return false;
@@ -1045,7 +1062,7 @@ const Battle = {
       state: this.state, cur: this.cur ? this.cur.p.idx : -1, turnIdx: this.turnIdx, turnCount: this.turnCount,
       order: this.order.map(t => t.p.idx), syncWait: [...this.syncWait], adWait: [...this.adWait],
       massKilled: this.massKilled, lastShooter: this.lastShooter ? this.lastShooter.p.idx : -1,
-      land: World.encodeLand(), unstable: World.encodeBits(World.unstable), suspended: World.suspended,
+      land: World.encodeLand(), unstable: World.encodeBits(World.unstable), suspended: World.suspended, gates: this.gates,
       tanks: this.tanks.map(t => ({
         x: t.x, y: t.y, a: t.angle, pw: t.power, e: t.energy, al: t.alive,
         sh: t.shield ? [t.shield.it.id, t.shield.energy] : null, ss: t.selShield, g: t.guidance, tr: t.triggers,
@@ -1058,6 +1075,7 @@ const Battle = {
     World.decodeLand(s.land);
     World.decodeBits(s.unstable, World.unstable);
     World.suspended = !!s.suspended;
+    this.gates = Gates.clean(s.gates);
     this.wind = s.wind; this.walls = s.walls; this.turnIdx = s.turnIdx; this.turnCount = s.turnCount;
     this.order = s.order.map(i => this.tanks[i]).filter(Boolean);
     this.syncWait = new Set(s.syncWait); this.adWait = new Set(s.adWait);
@@ -1344,6 +1362,7 @@ const Battle = {
     // walls
     const wc = WALL_COLORS[this.walls] || WALL_COLORS.NONE;
     s.vline(0, World.top, World.H - 1, wc); s.vline(World.W - 1, World.top, World.H - 1, wc);
+    Gates.drawClassic(s);
     for (const t of this.tanks) t.draw(s);
     for (const e of this.entities) e.draw(s);
     const u = Screen.ui, shadow = UIC.black, y = this.statusH + 12;

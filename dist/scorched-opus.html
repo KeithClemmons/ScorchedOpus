@@ -1785,7 +1785,7 @@ const Data = (() => {
     // Physics
     airViscosity: 0, gravity: 0.2, suspendDirt: 0, tanksFall: true, bordersExtend: 75, effectOfWalls: 'NONE',
     // Landscape
-    sky: 'RANDOM', maxWind: 200, changingWind: false, hostileEnvironment: true,
+    sky: 'RANDOM', maxWind: 200, changingWind: false, hostileEnvironment: true, skyGates: 'OFF', gateMotion: 'STAY',
     bumpiness: 20, slope: 20, flattenPeaks: false, randomLand: false, scannedMountains: 20,
     // Play options
     mode: 'SEQUENTIAL', teams: 'NONE', statusBar: false, playOrder: 'RANDOM', fastComputers: false, powerLimit: 'HALF',
@@ -1855,6 +1855,8 @@ const Data = (() => {
         { key: 'maxWind', label: '&Max. Wind', type: 'num', steps: [0, 5, 10, 20, 30, 40, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500] },
         { key: 'changingWind', label: '&Changing Wind', type: 'toggle' },
         { key: 'hostileEnvironment', label: '&Hostile Environment', type: 'toggle' },
+        { key: 'skyGates', label: 'Sky &Gates', type: 'cycle', values: ['OFF', 'FEW', 'MANY'] },
+        { key: 'gateMotion', label: 'Gates M&ove', type: 'cycle', values: ['STAY', 'SHUFFLE'] },
         { key: 'bumpiness', label: '&Bumpiness', type: 'num', steps: range(0, 100, 5) },
         { key: 'slope', label: '&Slope', type: 'num', steps: range(0, 100, 5) },
         { key: 'flattenPeaks', label: '&Flatten Peaks', type: 'toggle' },
@@ -4393,6 +4395,7 @@ class Shot {
       }
       const ox = this.x, oy = this.y;
       this.x += this.vx * h; this.y += this.vy * h;
+      Gates.cross(this, ox, oy);
       // MIRV / Death's Head split at apogee
       if ((this.wp.kind === 'mirv') && !this.sub && !this.split && this.vy >= 0 && this.age > 0.05) { this.doSplit(); return false; }
       const wr = applyWalls(this, this.walls);
@@ -4659,6 +4662,9 @@ class Shot {
 class Explosion {
   constructor(x, y, r, o) {
     o = o || {};
+    // Sky Gates: x damage, x blast area
+    const M = Battle.multNow();
+    if (M !== 1) { r *= Math.sqrt(M); if (o.dmg) o = Object.assign({}, o, { dmg: o.dmg * M }); }
     this.x = x; this.y = y; this.r = Math.max(2, r); this.o = o;
     this.type = o.type || 'normal';
     this.t = 0;
@@ -4987,7 +4993,9 @@ class Bomblet {
     while (rem > 1e-6) {
       const sp = Math.max(Math.abs(this.vx), Math.abs(this.vy), 1), h = Math.min(rem, 0.9 / sp);
       rem -= h; this.age += h;
+      const ox = this.x, oy = this.y;
       this.vy += g * h; this.x += this.vx * h; this.y += this.vy * h;
+      Gates.cross(this, ox, oy);
       if ((this.trailT -= h) <= 0) { this.trailT = 0.012; this.trail.push(Math.floor(this.x), Math.floor(this.y)); }
       if (Math.abs(this.x - this.ox) > this.R) this.vx *= -0.6;  // stays near where it hit
       let hit = this.y >= World.H - 1 || World.isLand(this.x, this.y) || this.age > 3;
@@ -5105,6 +5113,7 @@ class DigCollapse {
 }
 class Tunneler {
   constructor(owner, wp, x, y, ang, len, width, dir, delay, dig, boom) {
+    len *= Battle.multNow();
     this.owner = owner; this.wp = wp; this.x = x; this.y = y; this.ang = ang; this.len = len;
     this.width = width; this.dist = 0; this.air = 0; this.delay = delay;
     this.dig = dig || null; this.forks = 0; this.boom = boom || 0;
@@ -5190,6 +5199,7 @@ function waterFill(x, y, amount) {
 }
 class LiquidDirt {
   constructor(x, y, amount) {
+    amount = Math.max(1, Math.round(amount * Battle.multNow()));
     this.left = amount; this.t = 0; this.dur = 0.1;
     this.per = Math.max(1, Math.ceil(amount / (this.dur * 60)));
     const W = World.W;
@@ -5248,6 +5258,8 @@ class LiquidDirt {
 /* ------------------------------ liquids: napalm & liquid dirt ------------------------------ */
 class Liquid {
   constructor(x, y, o) {
+    const M = Battle.multNow();
+    if (M !== 1) o = Object.assign({}, o, { amount: Math.max(1, Math.round(o.amount * M)) });
     this.o = o; this.owner = o.owner;
     this.napalm = o.napalm;
     this.parts = [];
@@ -5407,6 +5419,7 @@ class Liquid {
 // a moment and falls as ordinary dirt
 class DirtSpray {
   constructor(x, y, r, spread, mult) {
+    r *= Math.sqrt(Battle.multNow());
     this.x = Math.round(x); this.y = Math.floor(World.isLand(x, y) ? y - World.ay : y);
     this.h = r;                                   // height, in columns
     this.slope = Math.tan(spread * DEG);          // half-width per column of height
@@ -5452,6 +5465,7 @@ class DirtSpray {
 // fall once it has gone. Both stages take time in proportion to the area they cover.
 class RiotWedge {
   constructor(x, y, r, a0, a1) {
+    r *= Math.sqrt(Battle.multNow());
     this.x = x; this.y = y; this.r = r; this.a0 = a0; this.a1 = a1;
     this.full = a1 - a0 >= 359;
     const area = r * r * (this.full ? 360 : a1 - a0);
@@ -5717,6 +5731,143 @@ class Chopper {
     if (this.phase >= 1) s.vline(this.x, this.y, this.tank.top, vga(50, 50, 50));
   }
 }
+
+/* ---------- js/gates.js ---------- */
+'use strict';
+/* =====================================================================
+   Sky Gates (Remastered, Landscape > Sky Gates): frames hung in the air
+   between the tanks. A shell that flies through one is changed by it,
+   once per gate:
+     x2 / x3 / x5   damage x, blast area x (radius by the square root);
+                    a shell's bomblets, warheads and hops inherit it
+     /2             half the damage and blast area
+     boost / brake  1.5x or half the speed
+     portal         one way: in the blue frame, out of the orange one,
+                    same heading and speed
+   Gates are laid out at the start of a round from the shared seeded
+   random numbers (so every machine agrees); with Gates Move: SHUFFLE the
+   host lays them out again at each turn and sends them to everyone.
+   ===================================================================== */
+
+const GATE_KINDS = {
+  x2: { m: 2, label: '×2', tag: 'X2', col: [96, 232, 128] },
+  x3: { m: 3, label: '×3', tag: 'X3', col: [72, 214, 255] },
+  x5: { m: 5, label: '×5', tag: 'X5', col: [255, 206, 64] },
+  half: { m: 0.5, label: '÷2', tag: '/2', col: [255, 86, 86] },
+  boost: { v: 1.5, label: 'BOOST', tag: 'FAST', col: [190, 120, 255] },
+  brake: { v: 0.5, label: 'BRAKE', tag: 'SLOW', col: [255, 150, 60] },
+  pin: { label: 'IN', tag: 'IN', col: [80, 150, 255] },
+  pout: { label: 'OUT', tag: 'OUT', col: [255, 150, 40] }
+};
+// how often each kind is picked (x2 and x3 are the common ones)
+const GATE_WEIGHTS = [['x2', 30], ['x3', 30], ['x5', 5], ['half', 12], ['boost', 10], ['brake', 8], ['portal', 9]];
+
+const Gates = {
+  // rng(a, b): a uniform number in [a, b) - srand for the shared layout, rand on the host for shuffles
+  place(rng) {
+    const W = World.W, ay = World.ay;
+    const picks = Cfg.skyGates === 'MANY' ? 6 : Cfg.skyGates === 'FEW' ? 3 : 0;
+    if (!picks) return [];
+    const tanks = Battle.tanks.filter(t => t.alive && !t.dying);
+    let x0 = 30, x1 = W - 30;
+    if (tanks.length >= 2) {
+      const xs = tanks.map(t => t.x);
+      const a = Math.min(...xs), b = Math.max(...xs);
+      if (b - a > 90) { x0 = a + 20; x1 = b - 20; }
+    }
+    const out = [];
+    let id = 1;
+    const spot = h => {
+      for (let tries = 0; tries < 60; tries++) {
+        const x = Math.round(rng(x0, x1));
+        if (tanks.some(t => Math.abs(t.x - x) < 24) || out.some(g => Math.abs(g.x - x) < 30)) continue;
+        let ground = World.H;
+        for (let dx = -6; dx <= 6; dx += 3) ground = Math.min(ground, World.surfaceY(clamp(x + dx, 0, W - 1)));
+        const lo = World.top + h + 14 * ay, hi = ground - h - 16 * ay;
+        if (hi <= lo) continue;
+        const y = Math.round(rng(lo, hi));
+        // never hung in rock (a cavern roof, an overhang)
+        let clear = true;
+        for (let yy = y - h; yy <= y + h && clear; yy += 2) for (const dx of [-3, 0, 3]) if (World.isLand(x + dx, yy)) { clear = false; break; }
+        if (clear) return { x, y };
+      }
+      return null;
+    };
+    const weightSum = GATE_WEIGHTS.reduce((s, w) => s + w[1], 0);
+    for (let n = 0; n < picks; n++) {
+      let r = rng(0, weightSum), kind = 'x2';
+      for (const [k, w] of GATE_WEIGHTS) { if ((r -= w) < 0) { kind = k; break; } }
+      const h = Math.round(rng(13, 20) * ay);
+      if (kind === 'portal') {
+        const a = spot(h);
+        if (!a) continue;
+        out.push({ id: id++, k: 'pin', x: a.x, y: a.y, h });
+        const inG = out[out.length - 1];
+        let b = null;
+        for (let tries = 0; tries < 8 && !b; tries++) { const s = spot(h); if (s && Math.abs(s.x - a.x) >= 70) b = s; }
+        if (!b) { out.pop(); continue; }
+        out.push({ id: id++, k: 'pout', x: b.x, y: b.y, h });
+        inG.to = id - 1;
+        continue;
+      }
+      const s = spot(h);
+      if (s) out.push({ id: id++, k: kind, x: s.x, y: s.y, h });
+    }
+    return out;
+  },
+  // gates arriving from the host: keep only well-formed ones
+  clean(list) {
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, 16).filter(g => g && GATE_KINDS[g.k]).map(g => {
+      const o = { id: g.id | 0, k: g.k, x: +g.x || 0, y: +g.y || 0, h: clamp(+g.h || 20, 4, 80) };
+      if (g.k === 'pin') o.to = g.to | 0;
+      return o;
+    });
+  },
+  // a projectile moved from (ox, oy) to (p.x, p.y): did it fly through a gate?
+  cross(p, ox, oy) {
+    const list = Battle.gates;
+    if (!list || !list.length || p.x === ox) return;
+    for (const g of list) {
+      if ((ox - g.x) * (p.x - g.x) > 0) continue;
+      if (p.used && p.used.has(g.id)) continue;
+      const t = (g.x - ox) / (p.x - ox), yc = oy + t * (p.y - oy);
+      if (Math.abs(yc - g.y) > g.h) continue;
+      if (!p.used) p.used = new Set();
+      p.used.add(g.id);
+      g.flash = performance.now();   // (cosmetic)
+      const K = GATE_KINDS[g.k];
+      if (K.m) p.mult = clamp((p.mult || 1) * K.m, 0.25, 10);
+      if (K.v) { p.vx *= K.v; p.vy *= K.v; }
+      if (g.k === 'pin') {
+        const to = list.find(o => o.id === g.to);
+        if (to) {
+          p.used.add(to.id); to.flash = g.flash;
+          p.x = to.x + (p.vx >= 0 ? 1.2 : -1.2);
+          p.y = to.y + clamp(yc - g.y, -to.h, to.h);
+          p.warps = (p.warps || 0) + 1;
+        }
+      }
+      Sound.pos(g.x).beep(g.k === 'half' || g.k === 'brake' ? 300 : g.k === 'x5' ? 1400 : g.k === 'pin' ? 600 : 950, 0.09, 0.5);
+      return;   // one gate per step (a portal has just moved it)
+    }
+  },
+  // classic look: pixel frames with a tag over them
+  drawClassic(s) {
+    const list = Battle.gates;
+    if (!list || !list.length) return;
+    const now = performance.now();
+    for (const g of list) {
+      const K = GATE_KINDS[g.k];
+      const lit = g.flash && now - g.flash < 400;
+      const c = lit ? vga(63, 63, 63) : vga(K.col[0] / 4, K.col[1] / 4, K.col[2] / 4);
+      const x0 = Math.round(g.x - 3), x1 = Math.round(g.x + 3), y0 = Math.round(g.y - g.h), y1 = Math.round(g.y + g.h);
+      s.vline(x0, y0, y1, c); s.vline(x1, y0, y1, c);
+      s.hline(x0, x1, y0, c); s.hline(x0, x1, y1, c);
+      Font.center(s, K.tag, Math.round(g.x), y0 - 9, c);
+    }
+  }
+};
 
 /* ---------- js/arsenal.js ---------- */
 'use strict';
@@ -6354,6 +6505,8 @@ const Battle = {
     this.entities = []; this.balloons = []; this.deaths = []; this.dyingNow = null;
     this.tanks = Game.players.map(p => new Tank(p));
     this.placeTanks();
+    // Sky Gates: laid out from the shared seeded numbers, so every machine agrees
+    this.gates = Cfg.skyGates !== 'OFF' ? Gates.place(srand) : [];
     this.orderTanks();
     this.turnIdx = -1; this.cur = null; this.plan = null; this.pendingTurn = null;
     this.syncWait = new Set(); this.syncShots = []; this.adWait = new Set(); this.hold = null;
@@ -6440,7 +6593,17 @@ const Battle = {
     const d = Cfg.firingDelay;
     return clamp(130 / Math.max(4, d), 0.25, 30);
   },
-  spawn(e) { this.entities.push(e); EventLog.spawned(e); return e; },
+  spawn(e) {
+    // whatever a projectile spawns (bomblets, warheads, hops, its blast) carries its Sky Gate multiplier
+    const p = this.curEnt;
+    if (p && p !== e) {
+      if (p.mult && p.mult !== 1 && e.mult === undefined) e.mult = p.mult;
+      if (p.used && !e.used && (e instanceof Shot || e instanceof Bomblet)) e.used = new Set(p.used);
+    }
+    this.entities.push(e); EventLog.spawned(e); return e;
+  },
+  // the Sky Gate multiplier for things being made right now
+  multNow() { return (this.curEnt && this.curEnt.mult) || 1; },
   terrainChanged() { /* dirt settles and tanks fall in simTick() */ },
   buried(t) {
     for (const a of [45, 90, 135]) {
@@ -6833,8 +6996,10 @@ const Battle = {
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
       const scaled = e instanceof Shot || e instanceof Bomblet || e instanceof Roller || e instanceof Tunneler || e instanceof DirtSpray;
+      this.curEnt = e;
       if (!e.update(TICK * (scaled ? ts : 1))) e._dead = true;
     }
+    this.curEnt = null;
     if (this.entities.some(e => e._dead)) this.entities = this.entities.filter(e => !e._dead);
     World.settle(Math.max(2, Math.round(4 * World.H / 480)));
     this.updateFalling(TICK);
@@ -6883,6 +7048,7 @@ const Battle = {
     const client = Net.isClient();
     switch (c.c) {
       case 'env': this.wind = c.wind; this.walls = c.walls; break;
+      case 'gates': this.gates = Gates.clean(c.g); break;
       case 'weather':
         if (c.kind === 'lightning') this.spawn(new Lightning(c.x));
         else this.spawn(new Meteor(c.x, c.vx));
@@ -7160,6 +7326,8 @@ const Battle = {
     if (Cfg.effectOfWalls === 'ERRATIC') walls = pick(WALL_TYPES);
     if (this.turnCount > 1) wind = this.rollWind(this.wind);
     if (walls !== this.walls || wind !== this.wind) this.act({ c: 'env', wind, walls });
+    // Gates Move: SHUFFLE - the host lays the gates out again for every turn
+    if (Cfg.skyGates !== 'OFF' && Cfg.gateMotion === 'SHUFFLE' && this.turnCount > 1) this.act({ c: 'gates', g: Gates.place(rand) });
     const w = this.rollWeather();
     if (w) { this.act(Object.assign({ c: 'weather' }, w)); return true; }
     return false;
@@ -7321,7 +7489,7 @@ const Battle = {
       state: this.state, cur: this.cur ? this.cur.p.idx : -1, turnIdx: this.turnIdx, turnCount: this.turnCount,
       order: this.order.map(t => t.p.idx), syncWait: [...this.syncWait], adWait: [...this.adWait],
       massKilled: this.massKilled, lastShooter: this.lastShooter ? this.lastShooter.p.idx : -1,
-      land: World.encodeLand(), unstable: World.encodeBits(World.unstable), suspended: World.suspended,
+      land: World.encodeLand(), unstable: World.encodeBits(World.unstable), suspended: World.suspended, gates: this.gates,
       tanks: this.tanks.map(t => ({
         x: t.x, y: t.y, a: t.angle, pw: t.power, e: t.energy, al: t.alive,
         sh: t.shield ? [t.shield.it.id, t.shield.energy] : null, ss: t.selShield, g: t.guidance, tr: t.triggers,
@@ -7334,6 +7502,7 @@ const Battle = {
     World.decodeLand(s.land);
     World.decodeBits(s.unstable, World.unstable);
     World.suspended = !!s.suspended;
+    this.gates = Gates.clean(s.gates);
     this.wind = s.wind; this.walls = s.walls; this.turnIdx = s.turnIdx; this.turnCount = s.turnCount;
     this.order = s.order.map(i => this.tanks[i]).filter(Boolean);
     this.syncWait = new Set(s.syncWait); this.adWait = new Set(s.adWait);
@@ -7620,6 +7789,7 @@ const Battle = {
     // walls
     const wc = WALL_COLORS[this.walls] || WALL_COLORS.NONE;
     s.vline(0, World.top, World.H - 1, wc); s.vline(World.W - 1, World.top, World.H - 1, wc);
+    Gates.drawClassic(s);
     for (const t of this.tanks) t.draw(s);
     for (const e of this.entities) e.draw(s);
     const u = Screen.ui, shadow = UIC.black, y = this.statusH + 12;
@@ -9697,14 +9867,14 @@ class StandingsScene {
      LocalTransport - BroadcastChannel between tabs of one browser
    ===================================================================== */
 
-const NET_V = 30;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second, v30 funky bomblets start from the surface
+const NET_V = 31;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second, v30 funky bomblets start from the surface, v31 sky gates
 const GAME_CMDS = new Set(['start', 'shop', 'shopwait', 'round', 'roundover', 'gameover', 'setai', 'msg']);
 // options that shape the shared game (sound, pointer and the like stay personal)
 const SYNC_KEYS = ['rounds', 'graphicsMode', 'firingDelay', 'fallingDelay', 'interestRate', 'cashAtStart', 'computersBuy',
   'freeMarket', 'scoringMode', 'airViscosity', 'gravity', 'suspendDirt', 'tanksFall', 'bordersExtend', 'effectOfWalls',
   'sky', 'maxWind', 'changingWind', 'hostileEnvironment', 'bumpiness', 'slope', 'flattenPeaks', 'randomLand',
   'scannedMountains', 'mode', 'teams', 'statusBar', 'playOrder', 'fastComputers', 'talkingTanks', 'talkProbability',
-  'attackFile', 'dieFile', 'armsLevel', 'bombIcon', 'tunneling', 'scale', 'tracePaths', 'extraDirt', 'uselessItems', 'impactDamage', 'extendedArsenal', 'powerLimit'];
+  'attackFile', 'dieFile', 'armsLevel', 'bombIcon', 'tunneling', 'scale', 'tracePaths', 'extraDirt', 'uselessItems', 'impactDamage', 'extendedArsenal', 'powerLimit', 'skyGates', 'gateMotion'];
 function syncedCfg() {
   const o = {};
   for (const k of SYNC_KEYS) o[k] = Cfg[k];
@@ -12011,6 +12181,8 @@ const Fx = {
     if (e instanceof Shot) {
       const s = this.state(e);
       if (e.delay > 0 || !s.trail) return;
+      // a portal moved it: start the trail again rather than streak across the sky
+      if ((e.warps || 0) !== (s.warps || 0)) { s.warps = e.warps; s.trail = []; }
       s.trail.push(e.x, e.y);
       if (s.trail.length > 36) s.trail.splice(0, 2);
       const k = e.wp.kind;
@@ -12148,6 +12320,7 @@ const Fx = {
     ctx.translate(Gfx.shakeX, Gfx.shakeY);
     this.drawTrace(ctx);
     if (B) this.drawWalls(ctx, B.walls);
+    if (B) this.drawGates(ctx, B);
     this.drawParts(ctx, 0);
     if (W.skyType === 'STORMY') this.drawRain(ctx, step, B ? B.wind : 0);
     if (B) {
@@ -12200,6 +12373,57 @@ const Fx = {
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.45)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
     if (dim > 0) { ctx.fillStyle = 'rgba(4,6,12,' + dim + ')'; ctx.fillRect(0, 0, w, h); }
+  },
+  // Sky Gates: glowing frames with their effect on a tag; portals are rings, blue in and orange out
+  drawGates(ctx, B) {
+    const list = B.gates;
+    if (!list || !list.length) return;
+    const now = performance.now(), u = Math.min(Gfx.sx, Gfx.sy);
+    ctx.save();
+    ctx.globalAlpha = 1;
+    for (const g of list) {
+      const K = GATE_KINDS[g.k], col = K.col;
+      const lit = g.flash ? clamp(1 - (now - g.flash) / 500, 0, 1) : 0;
+      const X = Gfx.X(g.x), Y = Gfx.Y(g.y), H = g.h * Gfx.sy, W = Math.max(8 * u, 6 * Gfx.sx);
+      const pulse = 0.75 + 0.25 * Math.sin(Gfx.t * 3 + g.x);
+      ctx.globalCompositeOperation = 'lighter';
+      this.drawGlow(ctx, X, Y, H * 1.1, col, 0.18 + 0.4 * lit);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      if (g.k === 'pin' || g.k === 'pout') {
+        // a ring with a swirl turning inside it
+        ctx.lineWidth = Math.max(2, 2.2 * u);
+        ctx.strokeStyle = rgba(mix3(col, WHITE3, 0.25 + 0.5 * lit), 0.95);
+        ctx.beginPath(); ctx.ellipse(X, Y, W * 0.9, H, 0, 0, TAU); ctx.stroke();
+        ctx.fillStyle = rgba(col, 0.16 + 0.2 * lit); ctx.fill();
+        ctx.lineWidth = Math.max(1, 1.2 * u); ctx.strokeStyle = rgba(col, 0.7 * pulse);
+        const spin = Gfx.t * (g.k === 'pin' ? 2.4 : -2.4);
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(X, Y, W * 0.55, H * 0.62, 0, spin + i * 2.1, spin + i * 2.1 + 1.2); ctx.stroke(); }
+      } else {
+        // a window frame
+        VUI.rr.call({ ctx }, X - W / 2, Y - H, W, H * 2, Math.min(W / 2, 3 * u));
+        ctx.fillStyle = rgba(col, 0.12 + 0.25 * lit); ctx.fill();
+        ctx.lineWidth = Math.max(2.5, 2.4 * u);
+        ctx.strokeStyle = rgba(mix3(col, WHITE3, 0.2 + 0.6 * lit), 0.9 * pulse + 0.1);
+        ctx.stroke();
+        // window bars
+        ctx.lineWidth = Math.max(1, u);
+        ctx.beginPath(); ctx.moveTo(X, Y - H + 2 * u); ctx.lineTo(X, Y + H - 2 * u); ctx.moveTo(X - W / 2 + 2 * u, Y); ctx.lineTo(X + W / 2 - 2 * u, Y);
+        ctx.strokeStyle = rgba(col, 0.45);
+        ctx.stroke();
+      }
+      // the tag
+      const fs = Math.max(12, 10 * u);
+      ctx.font = '700 ' + fs.toFixed(1) + 'px ' + FONT_UI;
+      const tw = ctx.measureText(K.label).width, ph = fs * 1.35, pw = tw + fs * 0.9, py = Y - H - ph - 3 * u;
+      VUI.rr.call({ ctx }, X - pw / 2, py, pw, ph, ph / 2);
+      ctx.fillStyle = 'rgba(8,10,18,0.78)'; ctx.fill();
+      ctx.lineWidth = Math.max(1, u * 0.8); ctx.strokeStyle = rgba(col, 0.9); ctx.stroke();
+      ctx.fillStyle = rgba(mix3(col, WHITE3, 0.35), 1);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(K.label, X, py + ph / 2 + u * 0.3);
+    }
+    ctx.textAlign = 'left';
+    ctx.restore();
   },
   drawWalls(ctx, walls) {
     const col = { CONCRETE: [190, 190, 200], PADDED: [120, 170, 255], RUBBER: [90, 230, 120], SPRING: [255, 220, 80], WRAP: [200, 120, 255] }[walls];
