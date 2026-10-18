@@ -22,7 +22,8 @@ const GATE_KINDS = {
   boost: { v: 1.5, label: 'BOOST', tag: 'FAST', col: [190, 120, 255] },
   brake: { v: 0.5, label: 'BRAKE', tag: 'SLOW', col: [255, 150, 60] },
   pin: { label: 'IN', tag: 'IN', col: [80, 150, 255] },
-  pout: { label: 'OUT', tag: 'OUT', col: [255, 150, 40] }
+  pout: { label: 'OUT', tag: 'OUT', col: [255, 150, 40] },
+  pg: { label: 'PORTAL', tag: 'PORT', col: [200, 200, 255] }   // Portal Gun ends (drawn in their owner's colour)
 };
 // how often each kind is picked (x2 and x3 are the common ones)
 const GATE_WEIGHTS = [['x2', 30], ['x3', 30], ['x5', 5], ['half', 12], ['boost', 10], ['brake', 8], ['portal', 9]];
@@ -80,10 +81,39 @@ const Gates = {
     }
     return out;
   },
+  // Portal Gun: a two-way pair, one end standing up at the top of the shot's arc (facing the way it
+  // flew), the other lying flat just above where it came down (facing up). Through either end and
+  // out of the other along that end's facing, at the same speed. One pair per player.
+  portalShot(shot, x, y) {
+    if (!shot.top) return;
+    const ay = World.ay, owner = shot.owner, idx = owner && owner.p ? owner.p.idx : 0;
+    let ax = clamp(shot.top.x, 8, World.W - 8), ayy = Math.max(shot.top.y, World.top + 18 * ay);
+    while (ayy > World.top + 18 * ay && World.isLand(ax, ayy)) ayy -= 2;
+    let gy = Math.floor(y);
+    const bx = clamp(Math.round(x), 14, World.W - 14);
+    while (gy > World.top && World.isLand(bx, gy)) gy--;
+    const by = Math.max(World.top + 12 * ay, gy - 7 * ay);
+    const col = [cR(owner.color), cG(owner.color), cB(owner.color)];
+    const A = { id: 100 + idx * 2, k: 'pg', owner: idx, col, x: Math.round(ax), y: Math.round(ayy), h: Math.round(16 * ay), fx: shot.top.dir, fy: 0 };
+    const B = { id: 101 + idx * 2, k: 'pg', owner: idx, col, x: bx, y: Math.round(by), w: 12, hz: true, fx: 0, fy: -1 };
+    A.to = B.id; B.to = A.id;
+    Battle.portals = (Battle.portals || []).filter(p => p.owner !== idx).concat([A, B]);
+    A.flash = B.flash = performance.now();
+    Sound.pos(x).beep(520, 0.12, 0.5); Sound.pos(x).beep(780, 0.12, 0.4, 0.1);
+  },
+  cleanPortals(list) {
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, 32).filter(g => g && g.k === 'pg').map(g => ({
+      id: g.id | 0, k: 'pg', owner: g.owner | 0, to: g.to | 0, x: +g.x || 0, y: +g.y || 0,
+      h: clamp(+g.h || 20, 4, 80), w: clamp(+g.w || 12, 4, 40), hz: !!g.hz,
+      fx: clamp(+g.fx || 0, -1, 1), fy: clamp(+g.fy || 0, -1, 1),
+      col: Array.isArray(g.col) ? g.col.slice(0, 3).map(v => clamp(v | 0, 0, 255)) : [200, 200, 255]
+    }));
+  },
   // gates arriving from the host: keep only well-formed ones
   clean(list) {
     if (!Array.isArray(list)) return [];
-    return list.slice(0, 16).filter(g => g && GATE_KINDS[g.k]).map(g => {
+    return list.slice(0, 16).filter(g => g && GATE_KINDS[g.k] && g.k !== 'pg').map(g => {
       const o = { id: g.id | 0, k: g.k, x: +g.x || 0, y: +g.y || 0, h: clamp(+g.h || 20, 4, 80) };
       if (g.k === 'pin') o.to = g.to | 0;
       return o;
@@ -91,19 +121,44 @@ const Gates = {
   },
   // a projectile moved from (ox, oy) to (p.x, p.y): did it fly through a gate?
   cross(p, ox, oy) {
-    const list = Battle.gates;
-    if (!list || !list.length || p.x === ox) return;
+    const gates = Battle.gates || [], portals = Battle.portals || [];
+    if (!gates.length && !portals.length) return;
+    const list = portals.length ? gates.concat(portals) : gates;
     for (const g of list) {
-      if ((ox - g.x) * (p.x - g.x) > 0) continue;
+      let along;   // where along the gate it crossed (from its middle)
+      if (g.hz) {
+        // lying flat: crossed its row within its width
+        if (p.y === oy || (oy - g.y) * (p.y - g.y) > 0) continue;
+        const t = (g.y - oy) / (p.y - oy);
+        along = ox + t * (p.x - ox) - g.x;
+        if (Math.abs(along) > g.w) continue;
+      } else {
+        if (p.x === ox || (ox - g.x) * (p.x - g.x) > 0) continue;
+        const t = (g.x - ox) / (p.x - ox);
+        along = oy + t * (p.y - oy) - g.y;
+        if (Math.abs(along) > g.h) continue;
+      }
       if (p.used && p.used.has(g.id)) continue;
-      const t = (g.x - ox) / (p.x - ox), yc = oy + t * (p.y - oy);
-      if (Math.abs(yc - g.y) > g.h) continue;
+      const yc = g.y + (g.hz ? 0 : along);
       if (!p.used) p.used = new Set();
       p.used.add(g.id);
       g.flash = performance.now();   // (cosmetic)
       const K = GATE_KINDS[g.k];
       if (K.m) p.mult = clamp((p.mult || 1) * K.m, 0.25, 10);
       if (K.v) { p.vx *= K.v; p.vy *= K.v; }
+      if (g.k === 'pg') {
+        // Portal Gun: out of the other end along its facing, at the same speed
+        const to = list.find(o => o.id === g.to);
+        if (to) {
+          p.used.add(to.id); to.flash = g.flash;
+          const sp = Math.hypot(p.vx, p.vy / World.ay);
+          const k = to.hz ? clamp(along / g.h * to.w, -to.w, to.w) : clamp(along / (g.w || g.h) * to.h, -to.h, to.h);
+          p.x = to.x + (to.hz ? k : 0) + to.fx * 1.5;
+          p.y = to.y + (to.hz ? 0 : k) + to.fy * 1.5 * World.ay;
+          p.vx = to.fx * sp; p.vy = to.fy * sp * World.ay;
+          p.warps = (p.warps || 0) + 1;
+        }
+      }
       if (g.k === 'pin') {
         const to = list.find(o => o.id === g.to);
         if (to) {
@@ -119,9 +174,15 @@ const Gates = {
   },
   // classic look: pixel frames with a tag over them
   drawClassic(s) {
+    const now = performance.now();
+    for (const g of Battle.portals || []) {
+      const lit = g.flash && now - g.flash < 400;
+      const c = lit ? vga(63, 63, 63) : rgb(g.col[0], g.col[1], g.col[2]);
+      if (g.hz) s.ellipse(g.x, g.y, g.w, 2.5 * World.ay, c);
+      else s.ellipse(g.x, g.y, 3, g.h, c);
+    }
     const list = Battle.gates;
     if (!list || !list.length) return;
-    const now = performance.now();
     for (const g of list) {
       const K = GATE_KINDS[g.k];
       const lit = g.flash && now - g.flash < 400;

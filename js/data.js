@@ -48,6 +48,7 @@ const Data = (() => {
     { id: 'teslaCoil', name: 'Tesla Coil', cost: 15000, bundle: 3, arms: 3, cat: W, kind: 'tesla', r: 70, dmgs: [75, 55, 35], ext: true, onShield: true },
     { id: 'bunkerBuster', name: 'Bunker Buster', cost: 16000, bundle: 2, arms: 3, cat: W, kind: 'buster', len: 42, r: 38, dmg: 170, ext: true },
     { id: 'empBlast', name: 'EMP Blast', cost: 11000, bundle: 3, arms: 2, cat: W, kind: 'emp', r: 60, ext: true, onShield: true },
+    { id: 'portalGun', name: 'Portal Gun', cost: 15000, bundle: 2, arms: 2, cat: W, kind: 'portalgun', ext: true },
 
     { id: 'heatGuidance', name: 'Heat Guidance', cost: 10000, bundle: 6, arms: 2, cat: M, kind: 'guidance', code: 'Ht' },
     { id: 'ballisticGuidance', name: 'Bal Guidance', cost: 10000, bundle: 2, arms: 2, cat: M, kind: 'guidance', code: 'B', target: true },

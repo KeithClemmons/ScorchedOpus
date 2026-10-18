@@ -266,6 +266,19 @@ const ItemArt = (() => {
       bolt(ctx, [[8.5, 6], [5, 8 + j], [6, 10], [2, 13]], '#bfe4ff'); bolt(ctx, [[15.5, 6], [19, 7 - j], [18, 9.5], [22.5, 11]], '#bfe4ff');
     },
     bunkerBuster: ctx => tilt(ctx, 1.05, () => missile(ctx, 19, 2.2, ['#8a93a6', '#454c5c', '#20252f'], C.amber, ['#8a93a6', '#454c5c', '#20252f'])),
+    portalGun: ctx => {
+      // two rings, blue and orange, a shell looping from one to the other
+      const spin = t() * 3;
+      for (const [cx, rgb, hex] of [[7, '90,160,255', '#6aa6ff'], [17, '255,150,50', '#ff9a3a']]) {
+        glow(ctx, cx, 12, 7, rgb, 0.45);
+        ctx.beginPath(); ctx.ellipse(cx, 12, 3.6, 8, 0, 0, TAU); ctx.fillStyle = 'rgba(' + rgb + ',0.25)'; ctx.fill();
+        ctx.lineWidth = 1.6; ctx.strokeStyle = hex; ctx.stroke(); ink(ctx, 0.5);
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.ellipse(cx, 12, 2, 5, 0, spin, spin + 2.2); ctx.stroke();
+      }
+      ctx.setLineDash([1.4, 1.4]); ctx.strokeStyle = 'rgba(255,240,200,0.9)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(8, 4); ctx.quadraticCurveTo(12, -1, 16, 4); ctx.stroke(); ctx.setLineDash([]);
+    },
     empBlast: ctx => {
       glow(ctx, 12, 12, 12, '106,160,255', 0.4);
       ctx.strokeStyle = 'rgba(160,200,255,0.9)'; ctx.lineWidth = 1.2;

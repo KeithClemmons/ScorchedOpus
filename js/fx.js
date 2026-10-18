@@ -446,6 +446,7 @@ const Fx = {
   },
   // Sky Gates: glowing frames with their effect on a tag; portals are rings, blue in and orange out
   drawGates(ctx, B) {
+    this.drawPortals(ctx, B);
     const list = B.gates;
     if (!list || !list.length) return;
     const now = performance.now(), u = Math.min(Gfx.sx, Gfx.sy);
@@ -493,6 +494,30 @@ const Fx = {
       ctx.fillText(K.label, X, py + ph / 2 + u * 0.3);
     }
     ctx.textAlign = 'left';
+    ctx.restore();
+  },
+  // Portal Gun pairs: rings in their owner's colour, one standing, one lying flat
+  drawPortals(ctx, B) {
+    const list = B.portals;
+    if (!list || !list.length) return;
+    const now = performance.now(), u = Math.min(Gfx.sx, Gfx.sy);
+    ctx.save();
+    for (const g of list) {
+      const col = g.col, lit = g.flash ? clamp(1 - (now - g.flash) / 600, 0, 1) : 0;
+      const X = Gfx.X(g.x), Y = Gfx.Y(g.y);
+      const rx = g.hz ? g.w * Gfx.sx : Math.max(5 * u, 3.6 * Gfx.sx), ry = g.hz ? Math.max(3.5 * u, 2.6 * Gfx.sy * World.ay) : g.h * Gfx.sy;
+      ctx.globalCompositeOperation = 'lighter';
+      this.drawGlow(ctx, X, Y, Math.max(rx, ry) * 1.2, col, 0.22 + 0.45 * lit);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.ellipse(X, Y, rx, ry, 0, 0, TAU);
+      ctx.fillStyle = rgba(mix3(col, [0, 0, 0], 0.55), 0.55); ctx.fill();
+      ctx.lineWidth = Math.max(2.5, 2.6 * u);
+      ctx.strokeStyle = rgba(mix3(col, WHITE3, 0.3 + 0.5 * lit), 1); ctx.stroke();
+      // a swirl turning inside
+      ctx.lineWidth = Math.max(1, 1.2 * u); ctx.strokeStyle = rgba(mix3(col, WHITE3, 0.5), 0.7);
+      const spin = Gfx.t * 2.6 * (g.id & 1 ? -1 : 1);
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(X, Y, rx * 0.6, ry * 0.6, 0, spin + i * 2.1, spin + i * 2.1 + 1.3); ctx.stroke(); }
+    }
     ctx.restore();
   },
   drawWalls(ctx, walls) {

@@ -110,12 +110,13 @@ and it contains none of the original game's code or files.
 - **Volume controls** in the bottom-right corner of every screen: click or drag the music and
   effects bars, or click an icon to mute it. The levels are saved and are also under Sound.
 
-**Extended arsenal** (five new weapons, alongside the 33 originals)
+**Extended arsenal** (six new weapons, alongside the 33 originals)
 
 | Weapon | What it does |
 | --- | --- |
 | Air Strike | A flare that calls in a bomber to drop a stick of five bombs around the target. |
 | Teleporter | Moves your tank to wherever the shot lands. |
+| Portal Gun | Opens a two-way portal pair in your tank's colour: one standing at the top of the shot's arc, one lying flat where it lands. Shells (anyone's) go in either end and come out of the other along its facing. One pair per player, for the rest of the round. |
 | Tesla Coil | Lightning that jumps from tank to tank, hitting up to three (never you). |
 | Bunker Buster | Drills through dirt and then detonates, which is good against dug-in tanks. |
 | EMP Blast | Knocks out shields and drains batteries, including your own if you are close. |

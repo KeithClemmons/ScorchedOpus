@@ -148,6 +148,7 @@ class Shot {
       const ox = this.x, oy = this.y;
       this.x += this.vx * h; this.y += this.vy * h;
       Gates.cross(this, ox, oy);
+      if (this.wp.kind === 'portalgun' && (!this.top || this.y < this.top.y)) this.top = { x: this.x, y: this.y, dir: this.vx >= 0 ? 1 : -1 };
       // MIRV / Death's Head split at apogee
       if ((this.wp.kind === 'mirv') && !this.sub && !this.split && this.vy >= 0 && this.age > 0.05) { this.doSplit(); return false; }
       const wr = applyWalls(this, this.walls);
@@ -383,6 +384,9 @@ class Shot {
         break;
       case 'dirtcharge':
         Battle.spawn(new DirtSpray(x, y, wp.r * sc, wp.spread, Cfg.extraDirt ? 2 : 1));
+        break;
+      case 'portalgun':
+        Gates.portalShot(this, x, y);
         break;
       case 'airstrike': case 'teleport': case 'tesla': case 'buster': case 'emp':
         Arsenal.impact(this, x, y, hitTank);

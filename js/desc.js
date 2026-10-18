@@ -42,6 +42,7 @@
     teslaCoil: 'Lightning that jumps between up to three tanks.',
     bunkerBuster: 'Drills into the ground, then detonates.',
     empBlast: 'Knocks out shields and drains batteries nearby.',
+    portalGun: 'Two-way portals: one at the top of its arc, one where it lands.',
     heatGuidance: 'Steers toward the nearest tank once close.',
     ballisticGuidance: 'Corrects the shot onto a target you pick.',
     horzGuidance: 'Levels off at the target\'s height and flies in.',

@@ -80,6 +80,7 @@ const Battle = {
     this.placeTanks();
     // Sky Gates: laid out from the shared seeded numbers, so every machine agrees
     this.gates = Cfg.skyGates !== 'OFF' ? Gates.place(srand) : [];
+    this.portals = [];   // Portal Gun pairs (one per player)
     this.orderTanks();
     this.turnIdx = -1; this.cur = null; this.plan = null; this.pendingTurn = null;
     this.syncWait = new Set(); this.syncShots = []; this.adWait = new Set(); this.hold = null;
@@ -1062,7 +1063,7 @@ const Battle = {
       state: this.state, cur: this.cur ? this.cur.p.idx : -1, turnIdx: this.turnIdx, turnCount: this.turnCount,
       order: this.order.map(t => t.p.idx), syncWait: [...this.syncWait], adWait: [...this.adWait],
       massKilled: this.massKilled, lastShooter: this.lastShooter ? this.lastShooter.p.idx : -1,
-      land: World.encodeLand(), unstable: World.encodeBits(World.unstable), suspended: World.suspended, gates: this.gates,
+      land: World.encodeLand(), unstable: World.encodeBits(World.unstable), suspended: World.suspended, gates: this.gates, portals: this.portals,
       tanks: this.tanks.map(t => ({
         x: t.x, y: t.y, a: t.angle, pw: t.power, e: t.energy, al: t.alive,
         sh: t.shield ? [t.shield.it.id, t.shield.energy] : null, ss: t.selShield, g: t.guidance, tr: t.triggers,
@@ -1076,6 +1077,7 @@ const Battle = {
     World.decodeBits(s.unstable, World.unstable);
     World.suspended = !!s.suspended;
     this.gates = Gates.clean(s.gates);
+    this.portals = Gates.cleanPortals(s.portals);
     this.wind = s.wind; this.walls = s.walls; this.turnIdx = s.turnIdx; this.turnCount = s.turnCount;
     this.order = s.order.map(i => this.tanks[i]).filter(Boolean);
     this.syncWait = new Set(s.syncWait); this.adWait = new Set(s.adWait);
