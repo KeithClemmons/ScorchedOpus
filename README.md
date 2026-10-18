@@ -93,10 +93,10 @@ and it contains none of the original game's code or files.
   removes it.
 - **Sky Gates** (Landscape > Sky Gates: Off, Few or Many): glowing frames hang in the air
   between the tanks, and a shell that flies through one is changed by it. ×2 and ×3 are the
-  common ones, ×5 is rare: they multiply the damage and the blast area, and a shell's bomblets,
-  warheads and hops inherit it. ÷2 halves them, BOOST and BRAKE speed the shell up or slow it
-  down, and a portal pair sends it in the blue ring and out of the orange one. Each gate works
-  once per shell. Gates Move picks STAY (the same gates all round) or SHUFFLE (new gates every
+  common ones, ×5 is rare: the shell becomes that many shells, fanned out a little (a Funky Bomb
+  through ×3 is three Funky Bombs; one shot grows to 15 shells at most). ÷2 halves the damage
+  and blast, BOOST and BRAKE speed the shell up or slow it down, and a portal pair sends it in
+  the blue ring and out of the orange one. Each gate works once per shell. Gates Move picks STAY (the same gates all round) or SHUFFLE (new gates every
   turn). Off by default; the computer players don't aim for them.
 - **Meteors and lightning** (Landscape > Hostile Environment): on starry skies a meteor can
   fall at the start of a turn, and in storms lightning can strike. A meteor now shows a

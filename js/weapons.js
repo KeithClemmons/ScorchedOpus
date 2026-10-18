@@ -128,6 +128,14 @@ class Shot {
     this.lazyArmed = false;
     this.walls = Battle.walls;
   }
+  // a copy of this shell in flight (Sky Gates x2 / x3 / x5)
+  clone() {
+    const c = new Shot({ owner: this.owner, wp: this.wp, x: this.x, y: this.y, vx: this.vx, vy: this.vy, guid: this.guid, target: this.target,
+      trigger: this.trigger, stage: this.stage, sub: this.sub, r: this.r, dmg: this.dmg, color: this.color, main: false });
+    c.age = this.age; c.leftOwner = true; c.split = this.split; c.mode = this.mode; c.walls = this.walls; c.top = this.top;
+    c.heatT = this.heatT; c.lazyArmed = this.lazyArmed;
+    return c;
+  }
   get vmax() { return Phys.vmax(); }
   update(dt) {
     if (this.delay > 0) { this.delay -= dt; return true; }
@@ -745,6 +753,11 @@ class Bomblet {
     this.ox = ox; this.R = R; this.age = 0; this.color = vgaq(hsl(rand(0, 360), 1, 0.55));
     this.delay = srand(0, 0.25);
     this.trail = []; this.trailT = 0;
+  }
+  clone() {
+    const c = new Bomblet(this.owner, this.x, this.y, this.vx, this.vy, this.r, this.dmg, this.ox, this.R);
+    c.delay = 0; c.age = this.age;
+    return c;
   }
   update(dt) {
     if (this.delay > 0) { this.delay -= dt; return true; }

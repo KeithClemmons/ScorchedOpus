@@ -4402,6 +4402,14 @@ class Shot {
     this.lazyArmed = false;
     this.walls = Battle.walls;
   }
+  // a copy of this shell in flight (Sky Gates x2 / x3 / x5)
+  clone() {
+    const c = new Shot({ owner: this.owner, wp: this.wp, x: this.x, y: this.y, vx: this.vx, vy: this.vy, guid: this.guid, target: this.target,
+      trigger: this.trigger, stage: this.stage, sub: this.sub, r: this.r, dmg: this.dmg, color: this.color, main: false });
+    c.age = this.age; c.leftOwner = true; c.split = this.split; c.mode = this.mode; c.walls = this.walls; c.top = this.top;
+    c.heatT = this.heatT; c.lazyArmed = this.lazyArmed;
+    return c;
+  }
   get vmax() { return Phys.vmax(); }
   update(dt) {
     if (this.delay > 0) { this.delay -= dt; return true; }
@@ -5019,6 +5027,11 @@ class Bomblet {
     this.ox = ox; this.R = R; this.age = 0; this.color = vgaq(hsl(rand(0, 360), 1, 0.55));
     this.delay = srand(0, 0.25);
     this.trail = []; this.trailT = 0;
+  }
+  clone() {
+    const c = new Bomblet(this.owner, this.x, this.y, this.vx, this.vy, this.r, this.dmg, this.ox, this.R);
+    c.delay = 0; c.age = this.age;
+    return c;
   }
   update(dt) {
     if (this.delay > 0) { this.delay -= dt; return true; }
@@ -5772,9 +5785,10 @@ class Chopper {
    Sky Gates (Remastered, Landscape > Sky Gates): frames hung in the air
    between the tanks. A shell that flies through one is changed by it,
    once per gate:
-     x2 / x3 / x5   damage x, blast area x (radius by the square root);
-                    a shell's bomblets, warheads and hops inherit it
-     /2             half the damage and blast area
+     x2 / x3 / x5   the shell becomes 2, 3 or 5 shells, fanned out a little
+                    (at most 15 from one shot, however many gates it meets)
+     /2             half the damage and blast area (its bomblets, warheads
+                    and hops inherit it)
      boost / brake  1.5x or half the speed
      portal         one way: in the blue frame, out of the orange one,
                     same heading and speed
@@ -5906,7 +5920,8 @@ const Gates = {
       const K = GATE_KINDS[g.k];
       // (cosmetic) a pop over the gate saying what just happened
       if (K.m || K.v) g.pop = { t: g.flash, text: K.m ? (K.m < 1 ? K.label : K.label + '!') : K.label };
-      if (K.m) p.mult = clamp((p.mult || 1) * K.m, 0.25, 10);
+      if (K.m && K.m < 1) p.mult = clamp((p.mult || 1) * K.m, 0.25, 1);
+      else if (K.m) Gates.split(p, K.m);
       if (K.v) { p.vx *= K.v; p.vy *= K.v; }
       if (g.k === 'pg') {
         // Portal Gun: out of the other end along its facing, at the same speed
@@ -5932,6 +5947,26 @@ const Gates = {
       }
       Sound.pos(g.x).beep(g.k === 'half' || g.k === 'brake' ? 300 : g.k === 'x5' ? 1400 : g.k === 'pin' ? 600 : 950, 0.09, 0.5);
       return;   // one gate per step (a portal has just moved it)
+    }
+  },
+  // x2 / x3 / x5: the projectile becomes n of itself, fanned a few degrees around its heading.
+  // Copies have used this gate already; one shot's family stops growing at 15.
+  split(p, n) {
+    if (!p.clone || (p.wp && p.wp.kind === 'portalgun')) return;
+    const fam = p.family || (p.family = { n: 1 });
+    const extra = Math.min(n - 1, Math.max(0, 15 - fam.n));
+    if (!extra) return;
+    const ay = World.ay, sp = Math.hypot(p.vx, p.vy / ay), a = Math.atan2(-p.vy / ay, p.vx);
+    const step = (n >= 5 ? 6 : 7) * DEG, total = extra + 1;
+    const head = i => { const b = a + (i - (total - 1) / 2) * step; return [Math.cos(b) * sp, -Math.sin(b) * sp * ay]; };
+    [p.vx, p.vy] = head(0);
+    for (let i = 1; i < total; i++) {
+      const c = p.clone();
+      [c.vx, c.vy] = head(i);
+      c.family = fam; fam.n++;
+      c.used = new Set(p.used);
+      if (p.mult) c.mult = p.mult;
+      Battle.spawn(c);
     }
   },
   // classic look: pixel frames with a tag over them
@@ -9957,7 +9992,7 @@ class StandingsScene {
      LocalTransport - BroadcastChannel between tabs of one browser
    ===================================================================== */
 
-const NET_V = 33;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second, v30 funky bomblets start from the surface, v31 sky gates, v32 portal gun, v33 gates work across their whole frame
+const NET_V = 34;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second, v30 funky bomblets start from the surface, v31 sky gates, v32 portal gun, v33 gates work across their whole frame, v34 multiplier gates split shells
 const GAME_CMDS = new Set(['start', 'shop', 'shopwait', 'round', 'roundover', 'gameover', 'setai', 'msg']);
 // options that shape the shared game (sound, pointer and the like stay personal)
 const SYNC_KEYS = ['rounds', 'graphicsMode', 'firingDelay', 'fallingDelay', 'interestRate', 'cashAtStart', 'computersBuy',

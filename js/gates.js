@@ -3,9 +3,10 @@
    Sky Gates (Remastered, Landscape > Sky Gates): frames hung in the air
    between the tanks. A shell that flies through one is changed by it,
    once per gate:
-     x2 / x3 / x5   damage x, blast area x (radius by the square root);
-                    a shell's bomblets, warheads and hops inherit it
-     /2             half the damage and blast area
+     x2 / x3 / x5   the shell becomes 2, 3 or 5 shells, fanned out a little
+                    (at most 15 from one shot, however many gates it meets)
+     /2             half the damage and blast area (its bomblets, warheads
+                    and hops inherit it)
      boost / brake  1.5x or half the speed
      portal         one way: in the blue frame, out of the orange one,
                     same heading and speed
@@ -137,7 +138,8 @@ const Gates = {
       const K = GATE_KINDS[g.k];
       // (cosmetic) a pop over the gate saying what just happened
       if (K.m || K.v) g.pop = { t: g.flash, text: K.m ? (K.m < 1 ? K.label : K.label + '!') : K.label };
-      if (K.m) p.mult = clamp((p.mult || 1) * K.m, 0.25, 10);
+      if (K.m && K.m < 1) p.mult = clamp((p.mult || 1) * K.m, 0.25, 1);
+      else if (K.m) Gates.split(p, K.m);
       if (K.v) { p.vx *= K.v; p.vy *= K.v; }
       if (g.k === 'pg') {
         // Portal Gun: out of the other end along its facing, at the same speed
@@ -163,6 +165,26 @@ const Gates = {
       }
       Sound.pos(g.x).beep(g.k === 'half' || g.k === 'brake' ? 300 : g.k === 'x5' ? 1400 : g.k === 'pin' ? 600 : 950, 0.09, 0.5);
       return;   // one gate per step (a portal has just moved it)
+    }
+  },
+  // x2 / x3 / x5: the projectile becomes n of itself, fanned a few degrees around its heading.
+  // Copies have used this gate already; one shot's family stops growing at 15.
+  split(p, n) {
+    if (!p.clone || (p.wp && p.wp.kind === 'portalgun')) return;
+    const fam = p.family || (p.family = { n: 1 });
+    const extra = Math.min(n - 1, Math.max(0, 15 - fam.n));
+    if (!extra) return;
+    const ay = World.ay, sp = Math.hypot(p.vx, p.vy / ay), a = Math.atan2(-p.vy / ay, p.vx);
+    const step = (n >= 5 ? 6 : 7) * DEG, total = extra + 1;
+    const head = i => { const b = a + (i - (total - 1) / 2) * step; return [Math.cos(b) * sp, -Math.sin(b) * sp * ay]; };
+    [p.vx, p.vy] = head(0);
+    for (let i = 1; i < total; i++) {
+      const c = p.clone();
+      [c.vx, c.vy] = head(i);
+      c.family = fam; fam.n++;
+      c.used = new Set(p.used);
+      if (p.mult) c.mult = p.mult;
+      Battle.spawn(c);
     }
   },
   // classic look: pixel frames with a tag over them
