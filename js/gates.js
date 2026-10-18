@@ -125,25 +125,18 @@ const Gates = {
     if (!gates.length && !portals.length) return;
     const list = portals.length ? gates.concat(portals) : gates;
     for (const g of list) {
-      let along;   // where along the gate it crossed (from its middle)
-      if (g.hz) {
-        // lying flat: crossed its row within its width
-        if (p.y === oy || (oy - g.y) * (p.y - g.y) > 0) continue;
-        const t = (g.y - oy) / (p.y - oy);
-        along = ox + t * (p.x - ox) - g.x;
-        if (Math.abs(along) > g.w) continue;
-      } else {
-        if (p.x === ox || (ox - g.x) * (p.x - g.x) > 0) continue;
-        const t = (g.x - ox) / (p.x - ox);
-        along = oy + t * (p.y - oy) - g.y;
-        if (Math.abs(along) > g.h) continue;
-      }
+      // inside the frame as drawn? (steps are under a pixel, so nothing slips through)
+      const hx = g.hz ? g.w : 3.5, hy = g.hz ? 2.5 * World.ay : g.h;
+      if (Math.abs(p.x - g.x) > hx || Math.abs(p.y - g.y) > hy) continue;
       if (p.used && p.used.has(g.id)) continue;
+      const along = g.hz ? p.x - g.x : p.y - g.y;   // where along the gate it came through
       const yc = g.y + (g.hz ? 0 : along);
       if (!p.used) p.used = new Set();
       p.used.add(g.id);
       g.flash = performance.now();   // (cosmetic)
       const K = GATE_KINDS[g.k];
+      // (cosmetic) a pop over the gate saying what just happened
+      if (K.m || K.v) g.pop = { t: g.flash, text: K.m ? (K.m < 1 ? K.label : K.label + '!') : K.label };
       if (K.m) p.mult = clamp((p.mult || 1) * K.m, 0.25, 10);
       if (K.v) { p.vx *= K.v; p.vy *= K.v; }
       if (g.k === 'pg') {

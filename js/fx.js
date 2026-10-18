@@ -492,6 +492,16 @@ const Fx = {
       ctx.fillStyle = rgba(mix3(col, WHITE3, 0.35), 1);
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(K.label, X, py + ph / 2 + u * 0.3);
+      // just used: the effect pops up over the gate
+      if (g.pop && now - g.pop.t < 1300) {
+        const k = (now - g.pop.t) / 1300, big = Math.max(30, 26 * u) * (k < 0.15 ? 0.6 + k / 0.15 * 0.4 : 1);
+        ctx.font = '400 ' + big.toFixed(1) + 'px ' + FONT_DISPLAY;
+        ctx.globalAlpha = k > 0.7 ? (1 - k) / 0.3 : 1;
+        const yy = Y - k * 30 * u;   // rises from the middle of the gate (clear of the HUD)
+        ctx.lineWidth = Math.max(3, big * 0.14); ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(g.pop.text, X, yy);
+        ctx.fillStyle = rgba(mix3(col, WHITE3, 0.3), 1); ctx.fillText(g.pop.text, X, yy);
+        ctx.globalAlpha = 1;
+      }
     }
     ctx.textAlign = 'left';
     ctx.restore();
@@ -924,6 +934,22 @@ const Fx = {
       ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = rgba(mix3(L.col, WHITE3, 0.6), 1);
       ctx.beginPath(); ctx.arc(X, Y, Math.max(1, sz * 0.75), 0, TAU); ctx.fill();
+    }
+    // Sky Gates: a boosted (or weakened) shell wears a ring in the gate's colour and its multiplier
+    if (e.mult && e.mult !== 1) {
+      const mc = e.mult < 1 ? [255, 86, 86] : e.mult >= 5 ? [255, 206, 64] : e.mult >= 3 ? [72, 214, 255] : [96, 232, 128];
+      const rr = sz * (2.4 + 0.25 * Math.sin(Gfx.t * 16));
+      ctx.globalCompositeOperation = 'lighter';
+      this.drawGlow(ctx, X, Y, rr * 2.2, mc, 0.55);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      ctx.strokeStyle = rgba(mc, 0.95); ctx.lineWidth = Math.max(1.5, Gfx.dpr * 1.5);
+      ctx.beginPath(); ctx.arc(X, Y, rr, 0, TAU); ctx.stroke();
+      const fs = Math.max(11, worldFont(1));
+      ctx.font = '700 ' + fs.toFixed(1) + 'px ' + FONT_UI; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const txt = e.mult < 1 ? '\u00f7' + Math.round(1 / e.mult) : '\u00d7' + (Math.round(e.mult * 10) / 10);
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(txt, X, Y - rr - fs * 0.7);
+      ctx.fillStyle = rgba(mix3(mc, WHITE3, 0.35), 1); ctx.fillText(txt, X, Y - rr - fs * 0.7);
+      ctx.textAlign = 'left';
     }
     if (e.mode || (e.guid && e.age > 0.05)) {
       ctx.strokeStyle = 'rgba(120,255,200,' + (0.4 + 0.3 * Math.sin(Gfx.t * 20)) + ')';

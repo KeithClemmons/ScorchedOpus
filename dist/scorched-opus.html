@@ -4676,6 +4676,10 @@ class Shot {
     }
   }
   draw(s) {
+    if (this.mult && this.mult !== 1 && this.delay <= 0) {
+      const c = this.mult < 1 ? vga(63, 20, 20) : this.mult >= 5 ? vga(63, 52, 16) : this.mult >= 3 ? vga(18, 53, 63) : vga(24, 58, 32);
+      Font.draw(s, this.mult < 1 ? '/' + Math.round(1 / this.mult) : 'X' + (Math.round(this.mult * 10) / 10), Math.round(this.x) + 4, Math.round(this.y) - 10, c);
+    }
     if (this.delay > 0) return;
     const bi = Cfg.bombIcon;
     if (bi === 'INVISIBLE') return;
@@ -5890,25 +5894,18 @@ const Gates = {
     if (!gates.length && !portals.length) return;
     const list = portals.length ? gates.concat(portals) : gates;
     for (const g of list) {
-      let along;   // where along the gate it crossed (from its middle)
-      if (g.hz) {
-        // lying flat: crossed its row within its width
-        if (p.y === oy || (oy - g.y) * (p.y - g.y) > 0) continue;
-        const t = (g.y - oy) / (p.y - oy);
-        along = ox + t * (p.x - ox) - g.x;
-        if (Math.abs(along) > g.w) continue;
-      } else {
-        if (p.x === ox || (ox - g.x) * (p.x - g.x) > 0) continue;
-        const t = (g.x - ox) / (p.x - ox);
-        along = oy + t * (p.y - oy) - g.y;
-        if (Math.abs(along) > g.h) continue;
-      }
+      // inside the frame as drawn? (steps are under a pixel, so nothing slips through)
+      const hx = g.hz ? g.w : 3.5, hy = g.hz ? 2.5 * World.ay : g.h;
+      if (Math.abs(p.x - g.x) > hx || Math.abs(p.y - g.y) > hy) continue;
       if (p.used && p.used.has(g.id)) continue;
+      const along = g.hz ? p.x - g.x : p.y - g.y;   // where along the gate it came through
       const yc = g.y + (g.hz ? 0 : along);
       if (!p.used) p.used = new Set();
       p.used.add(g.id);
       g.flash = performance.now();   // (cosmetic)
       const K = GATE_KINDS[g.k];
+      // (cosmetic) a pop over the gate saying what just happened
+      if (K.m || K.v) g.pop = { t: g.flash, text: K.m ? (K.m < 1 ? K.label : K.label + '!') : K.label };
       if (K.m) p.mult = clamp((p.mult || 1) * K.m, 0.25, 10);
       if (K.v) { p.vx *= K.v; p.vy *= K.v; }
       if (g.k === 'pg') {
@@ -9960,7 +9957,7 @@ class StandingsScene {
      LocalTransport - BroadcastChannel between tabs of one browser
    ===================================================================== */
 
-const NET_V = 32;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second, v30 funky bomblets start from the surface, v31 sky gates, v32 portal gun
+const NET_V = 33;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second, v30 funky bomblets start from the surface, v31 sky gates, v32 portal gun, v33 gates work across their whole frame
 const GAME_CMDS = new Set(['start', 'shop', 'shopwait', 'round', 'roundover', 'gameover', 'setai', 'msg']);
 // options that shape the shared game (sound, pointer and the like stay personal)
 const SYNC_KEYS = ['rounds', 'graphicsMode', 'firingDelay', 'fallingDelay', 'interestRate', 'cashAtStart', 'computersBuy',
@@ -12515,6 +12512,16 @@ const Fx = {
       ctx.fillStyle = rgba(mix3(col, WHITE3, 0.35), 1);
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(K.label, X, py + ph / 2 + u * 0.3);
+      // just used: the effect pops up over the gate
+      if (g.pop && now - g.pop.t < 1300) {
+        const k = (now - g.pop.t) / 1300, big = Math.max(30, 26 * u) * (k < 0.15 ? 0.6 + k / 0.15 * 0.4 : 1);
+        ctx.font = '400 ' + big.toFixed(1) + 'px ' + FONT_DISPLAY;
+        ctx.globalAlpha = k > 0.7 ? (1 - k) / 0.3 : 1;
+        const yy = Y - k * 30 * u;   // rises from the middle of the gate (clear of the HUD)
+        ctx.lineWidth = Math.max(3, big * 0.14); ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(g.pop.text, X, yy);
+        ctx.fillStyle = rgba(mix3(col, WHITE3, 0.3), 1); ctx.fillText(g.pop.text, X, yy);
+        ctx.globalAlpha = 1;
+      }
     }
     ctx.textAlign = 'left';
     ctx.restore();
@@ -12947,6 +12954,22 @@ const Fx = {
       ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = rgba(mix3(L.col, WHITE3, 0.6), 1);
       ctx.beginPath(); ctx.arc(X, Y, Math.max(1, sz * 0.75), 0, TAU); ctx.fill();
+    }
+    // Sky Gates: a boosted (or weakened) shell wears a ring in the gate's colour and its multiplier
+    if (e.mult && e.mult !== 1) {
+      const mc = e.mult < 1 ? [255, 86, 86] : e.mult >= 5 ? [255, 206, 64] : e.mult >= 3 ? [72, 214, 255] : [96, 232, 128];
+      const rr = sz * (2.4 + 0.25 * Math.sin(Gfx.t * 16));
+      ctx.globalCompositeOperation = 'lighter';
+      this.drawGlow(ctx, X, Y, rr * 2.2, mc, 0.55);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      ctx.strokeStyle = rgba(mc, 0.95); ctx.lineWidth = Math.max(1.5, Gfx.dpr * 1.5);
+      ctx.beginPath(); ctx.arc(X, Y, rr, 0, TAU); ctx.stroke();
+      const fs = Math.max(11, worldFont(1));
+      ctx.font = '700 ' + fs.toFixed(1) + 'px ' + FONT_UI; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const txt = e.mult < 1 ? '\u00f7' + Math.round(1 / e.mult) : '\u00d7' + (Math.round(e.mult * 10) / 10);
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(txt, X, Y - rr - fs * 0.7);
+      ctx.fillStyle = rgba(mix3(mc, WHITE3, 0.35), 1); ctx.fillText(txt, X, Y - rr - fs * 0.7);
+      ctx.textAlign = 'left';
     }
     if (e.mode || (e.guid && e.age > 0.05)) {
       ctx.strokeStyle = 'rgba(120,255,200,' + (0.4 + 0.3 * Math.sin(Gfx.t * 20)) + ')';

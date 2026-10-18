@@ -402,6 +402,10 @@ class Shot {
     }
   }
   draw(s) {
+    if (this.mult && this.mult !== 1 && this.delay <= 0) {
+      const c = this.mult < 1 ? vga(63, 20, 20) : this.mult >= 5 ? vga(63, 52, 16) : this.mult >= 3 ? vga(18, 53, 63) : vga(24, 58, 32);
+      Font.draw(s, this.mult < 1 ? '/' + Math.round(1 / this.mult) : 'X' + (Math.round(this.mult * 10) / 10), Math.round(this.x) + 4, Math.round(this.y) - 10, c);
+    }
     if (this.delay > 0) return;
     const bi = Cfg.bombIcon;
     if (bi === 'INVISIBLE') return;
