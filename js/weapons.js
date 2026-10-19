@@ -357,7 +357,7 @@ class Shot {
         for (let i = 0; i < n; i++) {
           const ang = srand(20, 160) * DEG, v = Phys.vmax() * srand(0.12, 0.3) * Math.sqrt(R / 80);
           const b = new Bomblet(o, x, gy - World.ay, Math.cos(ang) * v, -Math.sin(ang) * v * World.ay, srand(15, 22) * sc, wp.dmg, x, R);
-          b.delay = 0.3 + i * 0.95;
+          b.delay = 0.3 + i * 0.45;
           Battle.spawn(b);
         }
         break;
@@ -598,6 +598,8 @@ Explosion.prototype.updateBall = function (dt) {
       break;
     case 'wait':
       this.vt = this.growT;
+      // a funky blast doesn't hang around for the rest of its bomblets: it pulses and goes on its own
+      if (this.type === 'funky') { this.stage = 'pulse'; this.st = 0; this.holdT = 0.35; break; }
       // (and while the rest of the volley is still in the air: MIRV warheads, funky bomblets)
       if (!balls.some(e => e !== this && e.stage === 'grow') &&
           !Battle.entities.some(e => e instanceof Bomblet || (e instanceof Shot && e.delay <= 0 && !e.dead))) {
@@ -612,8 +614,8 @@ Explosion.prototype.updateBall = function (dt) {
       break;
     case 'black':
       this.vt = this.growT + this.holdT;
-      // the black discs open one at a time, oldest first
-      if (balls.find(e => e.stage === 'black' || e.stage === 'open') === this) {
+      // the black discs open one at a time, oldest first (a funky blast's straight away)
+      if (this.type === 'funky' || balls.find(e => e.type !== 'funky' && (e.stage === 'black' || e.stage === 'open')) === this) {
         this.stage = 'open'; this.st = 0;
         World.carveEllipse(this.x, this.y, this.r, this.r * World.ay);
         Battle.terrainChanged();

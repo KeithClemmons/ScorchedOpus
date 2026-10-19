@@ -79,7 +79,7 @@ const Battle = {
     this.tanks = Game.players.map(p => new Tank(p));
     this.placeTanks();
     // Sky Gates: laid out from the shared seeded numbers, so every machine agrees
-    this.gates = Cfg.skyGates !== 'OFF' ? Gates.place(srand) : [];
+    this.gates = Cfg.skyGates > 0 ? Gates.place(srand) : [];
     this.portals = [];   // Portal Gun pairs (one per player)
     this.orderTanks();
     this.turnIdx = -1; this.cur = null; this.plan = null; this.pendingTurn = null;
@@ -901,7 +901,7 @@ const Battle = {
     if (this.turnCount > 1) wind = this.rollWind(this.wind);
     if (walls !== this.walls || wind !== this.wind) this.act({ c: 'env', wind, walls });
     // Gates Move: SHUFFLE - the host lays the gates out again for every turn
-    if (Cfg.skyGates !== 'OFF' && Cfg.gateMotion === 'SHUFFLE' && this.turnCount > 1) this.act({ c: 'gates', g: Gates.place(rand) });
+    if (Cfg.skyGates > 0 && Cfg.gateMotion === 'SHUFFLE' && this.turnCount > 1) this.act({ c: 'gates', g: Gates.place(rand) });
     const w = this.rollWeather();
     if (w) { this.act(Object.assign({ c: 'weather' }, w)); return true; }
     return false;

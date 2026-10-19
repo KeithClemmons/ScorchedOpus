@@ -1810,7 +1810,7 @@ const Data = (() => {
     // Physics
     airViscosity: 0, gravity: 0.2, suspendDirt: 0, tanksFall: true, bordersExtend: 75, effectOfWalls: 'NONE',
     // Landscape
-    sky: 'RANDOM', maxWind: 200, changingWind: false, hostileEnvironment: true, skyGates: 'OFF', gateMotion: 'STAY',
+    sky: 'RANDOM', maxWind: 200, changingWind: false, hostileEnvironment: true, skyGates: 0, gateMotion: 'STAY',
     bumpiness: 20, slope: 20, flattenPeaks: false, randomLand: false, scannedMountains: 20,
     // Play options
     mode: 'SEQUENTIAL', teams: 'NONE', statusBar: false, playOrder: 'RANDOM', fastComputers: false, powerLimit: 'HALF',
@@ -1880,7 +1880,7 @@ const Data = (() => {
         { key: 'maxWind', label: '&Max. Wind', type: 'num', steps: [0, 5, 10, 20, 30, 40, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500] },
         { key: 'changingWind', label: '&Changing Wind', type: 'toggle' },
         { key: 'hostileEnvironment', label: '&Hostile Environment', type: 'toggle' },
-        { key: 'skyGates', label: 'Sky &Gates', type: 'cycle', values: ['OFF', 'FEW', 'MANY'] },
+        { key: 'skyGates', label: 'Sky &Gates', type: 'num', steps: [0, 1, 2, 3, 4, 5] },
         { key: 'gateMotion', label: 'Gates M&ove', type: 'cycle', values: ['STAY', 'SHUFFLE'] },
         { key: 'bumpiness', label: '&Bumpiness', type: 'num', steps: range(0, 100, 5) },
         { key: 'slope', label: '&Slope', type: 'num', steps: range(0, 100, 5) },
@@ -1941,6 +1941,8 @@ const Data = (() => {
 
 /* ---------- live configuration (Save Changes persists it) ---------- */
 const Cfg = Object.assign({}, Data.defaults, Store.get('scorch.cfg', {}));
+// (Sky Gates was OFF / FEW / MANY)
+if (typeof Cfg.skyGates !== 'number') Cfg.skyGates = { FEW: 3, MANY: 5 }[Cfg.skyGates] || 0;
 function saveConfig() { return Store.set('scorch.cfg', Cfg); }
 function scaleFactor() { return Cfg.scale === 'LARGE' ? 1.6 : Cfg.scale === 'MEDIUM' ? 1.3 : 1; }
 
@@ -4631,7 +4633,7 @@ class Shot {
         for (let i = 0; i < n; i++) {
           const ang = srand(20, 160) * DEG, v = Phys.vmax() * srand(0.12, 0.3) * Math.sqrt(R / 80);
           const b = new Bomblet(o, x, gy - World.ay, Math.cos(ang) * v, -Math.sin(ang) * v * World.ay, srand(15, 22) * sc, wp.dmg, x, R);
-          b.delay = 0.3 + i * 0.95;
+          b.delay = 0.3 + i * 0.45;
           Battle.spawn(b);
         }
         break;
@@ -4872,6 +4874,8 @@ Explosion.prototype.updateBall = function (dt) {
       break;
     case 'wait':
       this.vt = this.growT;
+      // a funky blast doesn't hang around for the rest of its bomblets: it pulses and goes on its own
+      if (this.type === 'funky') { this.stage = 'pulse'; this.st = 0; this.holdT = 0.35; break; }
       // (and while the rest of the volley is still in the air: MIRV warheads, funky bomblets)
       if (!balls.some(e => e !== this && e.stage === 'grow') &&
           !Battle.entities.some(e => e instanceof Bomblet || (e instanceof Shot && e.delay <= 0 && !e.dead))) {
@@ -4886,8 +4890,8 @@ Explosion.prototype.updateBall = function (dt) {
       break;
     case 'black':
       this.vt = this.growT + this.holdT;
-      // the black discs open one at a time, oldest first
-      if (balls.find(e => e.stage === 'black' || e.stage === 'open') === this) {
+      // the black discs open one at a time, oldest first (a funky blast's straight away)
+      if (this.type === 'funky' || balls.find(e => e.type !== 'funky' && (e.stage === 'black' || e.stage === 'open')) === this) {
         this.stage = 'open'; this.st = 0;
         World.carveEllipse(this.x, this.y, this.r, this.r * World.ay);
         Battle.terrainChanged();
@@ -5815,7 +5819,7 @@ const Gates = {
   // rng(a, b): a uniform number in [a, b) - srand for the shared layout, rand on the host for shuffles
   place(rng) {
     const W = World.W, ay = World.ay;
-    const picks = Cfg.skyGates === 'MANY' ? 6 : Cfg.skyGates === 'FEW' ? 3 : 0;
+    const picks = clamp(Cfg.skyGates | 0, 0, 5);   // (a portal pair counts as one)
     if (!picks) return [];
     const tanks = Battle.tanks.filter(t => t.alive && !t.dying);
     let x0 = 30, x1 = W - 30;
@@ -6629,7 +6633,7 @@ const Battle = {
     this.tanks = Game.players.map(p => new Tank(p));
     this.placeTanks();
     // Sky Gates: laid out from the shared seeded numbers, so every machine agrees
-    this.gates = Cfg.skyGates !== 'OFF' ? Gates.place(srand) : [];
+    this.gates = Cfg.skyGates > 0 ? Gates.place(srand) : [];
     this.portals = [];   // Portal Gun pairs (one per player)
     this.orderTanks();
     this.turnIdx = -1; this.cur = null; this.plan = null; this.pendingTurn = null;
@@ -7451,7 +7455,7 @@ const Battle = {
     if (this.turnCount > 1) wind = this.rollWind(this.wind);
     if (walls !== this.walls || wind !== this.wind) this.act({ c: 'env', wind, walls });
     // Gates Move: SHUFFLE - the host lays the gates out again for every turn
-    if (Cfg.skyGates !== 'OFF' && Cfg.gateMotion === 'SHUFFLE' && this.turnCount > 1) this.act({ c: 'gates', g: Gates.place(rand) });
+    if (Cfg.skyGates > 0 && Cfg.gateMotion === 'SHUFFLE' && this.turnCount > 1) this.act({ c: 'gates', g: Gates.place(rand) });
     const w = this.rollWeather();
     if (w) { this.act(Object.assign({ c: 'weather' }, w)); return true; }
     return false;
@@ -9992,7 +9996,7 @@ class StandingsScene {
      LocalTransport - BroadcastChannel between tabs of one browser
    ===================================================================== */
 
-const NET_V = 34;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second, v30 funky bomblets start from the surface, v31 sky gates, v32 portal gun, v33 gates work across their whole frame, v34 multiplier gates split shells
+const NET_V = 35;   // Remastered: new weapons and rules make it a different game from Classic (v1); v3 Power Limit, v4 1.5-sized tanks and terrain, v5 varied terrain + power 200, v6 random death blasts, v7 1.5 damage pay, v8 1.5 bundle sizes, v9 dirt geyser deaths, v10 death beam, v11 deeper cavern roofs, v12 blasts cool before they go, v13 double-blast deaths, v14 Triple needs the Extended Arsenal, v15 1.5 auto defense price, v16 FIT SCREEN + shells gone off the side, v17 mag deflectors push shells aside, v18 mag shields have no bubble, v19 1.5 dirt charge cone + plasma disc, v20 1.5 dirt balls, liquid dirt, diggers, v21 1.5 sandhogs, v22 measured sizes at Normal scale, v23 1.5 riot weapons + zigzag sandhogs, v24 1.5 fireball timing + rolling, v25 1.5 leapfrog + napalm, v26 fireball volleys pulse together, v27 1.5 nukes + funky bomb, v28 fireball growth capped at 3s, v29 funky bomblets once a second, v30 funky bomblets start from the surface, v31 sky gates, v32 portal gun, v33 gates work across their whole frame, v34 multiplier gates split shells, v35 quicker funky bombs, sky gates 0-5
 const GAME_CMDS = new Set(['start', 'shop', 'shopwait', 'round', 'roundover', 'gameover', 'setai', 'msg']);
 // options that shape the shared game (sound, pointer and the like stay personal)
 const SYNC_KEYS = ['rounds', 'graphicsMode', 'firingDelay', 'fallingDelay', 'interestRate', 'cashAtStart', 'computersBuy',

@@ -33,7 +33,7 @@ const Gates = {
   // rng(a, b): a uniform number in [a, b) - srand for the shared layout, rand on the host for shuffles
   place(rng) {
     const W = World.W, ay = World.ay;
-    const picks = Cfg.skyGates === 'MANY' ? 6 : Cfg.skyGates === 'FEW' ? 3 : 0;
+    const picks = clamp(Cfg.skyGates | 0, 0, 5);   // (a portal pair counts as one)
     if (!picks) return [];
     const tanks = Battle.tanks.filter(t => t.alive && !t.dying);
     let x0 = 30, x1 = W - 30;

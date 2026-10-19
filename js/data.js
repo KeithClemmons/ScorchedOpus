@@ -144,7 +144,7 @@ const Data = (() => {
     // Physics
     airViscosity: 0, gravity: 0.2, suspendDirt: 0, tanksFall: true, bordersExtend: 75, effectOfWalls: 'NONE',
     // Landscape
-    sky: 'RANDOM', maxWind: 200, changingWind: false, hostileEnvironment: true, skyGates: 'OFF', gateMotion: 'STAY',
+    sky: 'RANDOM', maxWind: 200, changingWind: false, hostileEnvironment: true, skyGates: 0, gateMotion: 'STAY',
     bumpiness: 20, slope: 20, flattenPeaks: false, randomLand: false, scannedMountains: 20,
     // Play options
     mode: 'SEQUENTIAL', teams: 'NONE', statusBar: false, playOrder: 'RANDOM', fastComputers: false, powerLimit: 'HALF',
@@ -214,7 +214,7 @@ const Data = (() => {
         { key: 'maxWind', label: '&Max. Wind', type: 'num', steps: [0, 5, 10, 20, 30, 40, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500] },
         { key: 'changingWind', label: '&Changing Wind', type: 'toggle' },
         { key: 'hostileEnvironment', label: '&Hostile Environment', type: 'toggle' },
-        { key: 'skyGates', label: 'Sky &Gates', type: 'cycle', values: ['OFF', 'FEW', 'MANY'] },
+        { key: 'skyGates', label: 'Sky &Gates', type: 'num', steps: [0, 1, 2, 3, 4, 5] },
         { key: 'gateMotion', label: 'Gates M&ove', type: 'cycle', values: ['STAY', 'SHUFFLE'] },
         { key: 'bumpiness', label: '&Bumpiness', type: 'num', steps: range(0, 100, 5) },
         { key: 'slope', label: '&Slope', type: 'num', steps: range(0, 100, 5) },
@@ -275,5 +275,7 @@ const Data = (() => {
 
 /* ---------- live configuration (Save Changes persists it) ---------- */
 const Cfg = Object.assign({}, Data.defaults, Store.get('scorch.cfg', {}));
+// (Sky Gates was OFF / FEW / MANY)
+if (typeof Cfg.skyGates !== 'number') Cfg.skyGates = { FEW: 3, MANY: 5 }[Cfg.skyGates] || 0;
 function saveConfig() { return Store.set('scorch.cfg', Cfg); }
 function scaleFactor() { return Cfg.scale === 'LARGE' ? 1.6 : Cfg.scale === 'MEDIUM' ? 1.3 : 1; }

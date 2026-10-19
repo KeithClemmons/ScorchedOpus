@@ -91,7 +91,7 @@ and it contains none of the original game's code or files.
   point of energy left, so a tank at 27% health can't fire above 270. `HALF` (the default here)
   halves the penalty, so the same tank still gets 635. `ORIGINAL` keeps the 1.5 rule and `OFF`
   removes it.
-- **Sky Gates** (Landscape > Sky Gates: Off, Few or Many): glowing frames hang in the air
+- **Sky Gates** (Landscape > Sky Gates: how many, 0 to 5): glowing frames hang in the air
   between the tanks, and a shell that flies through one is changed by it. ×2 and ×3 are the
   common ones, ×5 is rare: the shell becomes that many shells, fanned out a little (a Funky Bomb
   through ×3 is three Funky Bombs; one shot grows to 15 shells at most). ÷2 halves the damage
